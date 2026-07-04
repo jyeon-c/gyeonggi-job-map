@@ -60,14 +60,22 @@
 
   /* ---------- 유틸 ---------- */
   function ddayOf(job) {
-    var diff = Math.ceil((new Date(job.deadline) - TODAY) / 86400000);
-    return diff;
+    if (!job.deadline) return null; // 상시채용
+    return Math.ceil((new Date(job.deadline) - TODAY) / 86400000);
   }
 
   function ddayLabel(diff) {
+    if (diff === null) return "상시채용";
     if (diff < 0) return "마감";
     if (diff === 0) return "오늘 마감";
     return "D-" + diff;
+  }
+
+  /* 복수 지역 표기("의정부시, 서울 강남구, …")는 첫 지역 + '외'로 축약 */
+  function regionShort(region) {
+    var parts = region.split(",");
+    if (parts.length === 1) return region;
+    return parts[0].trim() + " 외 " + (parts.length - 1);
   }
 
   function sourceLabel(src) {
@@ -84,7 +92,7 @@
   function getVisibleJobs() {
     var kw = state.keyword.trim().toLowerCase();
 
-    var jobs = MOCK_JOBS.filter(function (job) {
+    var jobs = JOBS_DATA.filter(function (job) {
       if (state.filters.source && job.source !== state.filters.source) return false;
       if (state.filters.career && job.career !== state.filters.career) return false;
       if (state.filters.education && job.education !== state.filters.education) return false;
@@ -99,7 +107,10 @@
 
     jobs.sort(function (a, b) {
       if (state.sort === "deadline") {
-        return new Date(a.deadline) - new Date(b.deadline);
+        // 상시채용(deadline 없음)은 뒤로
+        var da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+        var db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+        return da - db;
       }
       return new Date(b.postedAt) - new Date(a.postedAt); // latest
     });
@@ -157,12 +168,12 @@
             '" data-id="' + job.id + '" tabindex="0">' +
           '<div class="job-card__top">' +
             '<span class="badge badge--' + job.source + '">' + sourceLabel(job.source) + '</span>' +
-            '<span class="job-card__dday' + (diff <= 3 ? " is-urgent" : "") + '">' + ddayLabel(diff) + '</span>' +
+            '<span class="job-card__dday' + (diff !== null && diff <= 3 ? " is-urgent" : "") + '">' + ddayLabel(diff) + '</span>' +
           '</div>' +
           '<h3 class="job-card__title">' + esc(job.title) + '</h3>' +
           '<p class="job-card__company">' + esc(job.company) + '</p>' +
           '<div class="job-card__meta">' +
-            '<span>' + esc(job.region) + '</span>' +
+            '<span>' + esc(regionShort(job.region)) + '</span>' +
             '<span>' + esc(job.career) + '</span>' +
             '<span>' + esc(job.education) + '</span>' +
             '<span>' + esc(job.empType) + '</span>' +
@@ -179,6 +190,8 @@
     var $wrap = $("#mapMarkers").empty();
 
     jobs.forEach(function (job) {
+      if (job.lat == null || job.lng == null) return; // 좌표 미확보 공고는 마커 생략
+
       var x = ((job.lng - BOUNDS.minLng) / (BOUNDS.maxLng - BOUNDS.minLng)) * 84 + 8; // 8~92%
       var y = (1 - (job.lat - BOUNDS.minLat) / (BOUNDS.maxLat - BOUNDS.minLat)) * 78 + 12; // 12~90%
 
@@ -201,14 +214,15 @@
       $box.prop("hidden", true).empty();
       return;
     }
-    var job = MOCK_JOBS.filter(function (j) { return j.id === state.selectedId; })[0];
+    var job = JOBS_DATA.filter(function (j) { return j.id === state.selectedId; })[0];
     if (!job) { $box.prop("hidden", true).empty(); return; }
 
+    var approx = job.geocodePrecision === "region_approx" ? ' · <em>위치 근사</em>' : '';
     $box.prop("hidden", false).html(
       '<button type="button" class="map-selected__close" aria-label="닫기">×</button>' +
       '<p class="map-selected__title">' + esc(job.title) + '</p>' +
-      '<p class="map-selected__info">' + esc(job.company) + ' · ' + esc(job.region) +
-        ' · ' + esc(job.salary) + ' · ' + ddayLabel(ddayOf(job)) + '</p>'
+      '<p class="map-selected__info">' + esc(job.company) + ' · ' + esc(regionShort(job.region)) +
+        ' · ' + esc(job.salary) + ' · ' + ddayLabel(ddayOf(job)) + approx + '</p>'
     );
   }
 
