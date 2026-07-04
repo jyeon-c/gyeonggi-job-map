@@ -32,3 +32,6 @@ logs/
 
 # === Docker 관련 로컬 볼륨 (필요 시) ===
 infra/postgres-data/
+
+# === 데이터 파이프라인 파생 산출물 ===
+data/processed/
