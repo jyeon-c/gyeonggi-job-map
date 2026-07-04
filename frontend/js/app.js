@@ -230,15 +230,19 @@
     });
 
     // 현재 결과 전체가 보이도록 최초 1회 범위 맞춤
+    fitMapToJobs();
+    renderMarkers(getVisibleJobs());
+  }
+
+  /* 현재 결과 전체가 보이도록 지도 범위 조정 (컨테이너가 보이는 상태에서 호출해야 정확) */
+  function fitMapToJobs() {
     var jobs = getVisibleJobs();
-    if (jobs.length) {
-      var bounds = new kakao.maps.LatLngBounds();
-      jobs.forEach(function (job) {
-        if (job.lat != null) bounds.extend(new kakao.maps.LatLng(job.lat, job.lng));
-      });
-      kakaoMap.setBounds(bounds);
-    }
-    renderMarkers(jobs);
+    if (!kakaoMap || !jobs.length) return;
+    var bounds = new kakao.maps.LatLngBounds();
+    jobs.forEach(function (job) {
+      if (job.lat != null) bounds.extend(new kakao.maps.LatLng(job.lat, job.lng));
+    });
+    kakaoMap.setBounds(bounds);
   }
 
   function markerImage(color, big) {
@@ -444,10 +448,10 @@
       var toMap = $(this).data("view") === "list";
       $("body").toggleClass("mobile-map-view", toMap);
       $(this).data("view", toMap ? "map" : "list").text(toMap ? "리스트 보기" : "지도 보기");
-      // display:none 상태에서 생성된 지도는 크기 재계산 필요
+      // display:none 상태에서 생성된 지도는 크기 재계산 + 범위 재조정 필요
       if (toMap && useKakao) {
         kakaoMap.relayout();
-        kakaoMap.setCenter(new kakao.maps.LatLng(37.41, 127.15));
+        fitMapToJobs();
       }
     });
   }
