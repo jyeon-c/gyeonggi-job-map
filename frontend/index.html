@@ -93,9 +93,9 @@
   </button>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <!-- 카카오맵 SDK: 백엔드/키 준비 후 아래 주석 해제
-  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=YOUR_APP_KEY&autoload=false"></script>
-  -->
+  <!-- config.js: scripts/apply-env.ps1 이 .env 에서 생성 (gitignore 대상, 템플릿은 config.example.js) -->
+  <script src="js/config.js"></script>
+  <!-- 카카오맵 SDK는 app.js 가 config 의 키로 동적 로드. 키 없음/도메인 미등록 시 플레이스홀더 폴백 -->
   <script src="js/jobs-data.js"></script>
   <script src="js/app.js"></script>
 </body>

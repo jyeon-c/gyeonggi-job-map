@@ -391,9 +391,13 @@ button { font-family: inherit; cursor: pointer; }
   min-width: 0;
 }
 
-.map-placeholder {
+/* 지도 컨테이너 자체의 크기/위치 (플레이스홀더 여부와 무관하게 유지) */
+#map {
   position: absolute;
   inset: 0;
+}
+
+.map-placeholder {
   background:
     linear-gradient(rgba(190, 205, 220, 0.25) 1px, transparent 1px),
     linear-gradient(90deg, rgba(190, 205, 220, 0.25) 1px, transparent 1px),

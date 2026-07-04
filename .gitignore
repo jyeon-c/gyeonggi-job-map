@@ -35,3 +35,6 @@ infra/postgres-data/
 
 # === 데이터 파이프라인 파생 산출물 ===
 data/processed/
+
+# === 프런트 로컬 설정 (apply-env.ps1 생성) ===
+frontend/js/config.js
