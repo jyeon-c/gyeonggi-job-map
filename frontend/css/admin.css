@@ -171,6 +171,7 @@ body.admin {
 }
 
 .bar-row__track {
+  display: block;
   height: 18px;
   background: var(--bg-page);
   border-radius: 5px;
@@ -178,6 +179,7 @@ body.admin {
 }
 
 .bar-row__fill {
+  display: block;          /* span 기본 inline 이면 width/height 무시 → 막대가 안 보임 */
   height: 100%;
   border-radius: 5px;
   background: var(--primary);
