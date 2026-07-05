@@ -11,15 +11,25 @@
 - [x] 스왑 2GB 설정
 - [x] GitHub 레포 **공개(Public) 전환** 후 소스 clone (`~/gyeonggi-job-map`)
 - [x] `.env` 작성 완료 (DB/관리자 비밀번호 설정, 카카오 JS 키)
-- [ ] `docker compose up -d --build` ← **다음 단계**
-- [ ] `docker compose ps` 로 3개 컨테이너 Up 확인
-- [ ] 카카오 콘솔 JavaScript SDK 도메인에 `http://3.34.208.244` 등록
-- [ ] `http://3.34.208.244/` 접속 확인 (+ `/admin.html` 로그인)
+- [x] `docker compose up -d --build` 성공 (db/backend/nginx 3컨테이너 Up)
+- [x] 데이터 적재 확인 ("채용공고 527건 적재 완료")
+- [x] `http://3.34.208.244/` 접속 확인 — **배포 성공** ✅
+- [x] 카카오 JavaScript SDK 도메인에 `http://3.34.208.244` 등록 → 지도 표시
+- [x] `/admin.html` 관리자 로그인 확인 (admin / 설정한 비번)
+
+**→ 1차 배포 완료 (2026-07-05). 서비스 URL: http://3.34.208.244/**
 
 > 메모
 > - 레포는 비밀정보가 커밋되지 않아 Public 전환해도 안전(.env·config.js gitignore).
 > - `.env` 는 서버 `~/gyeonggi-job-map/.env` 에만 존재(커밋 안 됨). 관리자 로그인: `admin` / (설정한 비번).
 > - GitHub 원격 remote 는 lowercase `jyeon-c` 로 접근됨.
+> - **배포 브랜치는 `main`** — 서버는 main 을 clone/pull 한다. (jobs.json 이 dev 에만 있어 빌드 실패했던 이슈 → main 갱신으로 해결)
+> - `jobs.json`(배포 시드)은 `.gitignore` 예외로 커밋됨(`data/processed/*` + `!jobs.json`).
+
+### 트러블슈팅 기록 (실제 겪은 것)
+1. `COPY data/processed/jobs.json ... not found` → jobs.json 이 gitignore 로 커밋 안 됨 → 예외 추가 후 커밋.
+2. `git pull` 이 "Already up to date" → 서버는 main, 커밋은 dev 에만 있었음 → main 을 dev 로 갱신 후 서버 재pull.
+3. `curl ...?size=1` 400 → 붙여넣기로 `size=1git` 이 된 것(실제 오류 아님). 명령은 한 줄씩 끊어 입력.
 
 ---
 
