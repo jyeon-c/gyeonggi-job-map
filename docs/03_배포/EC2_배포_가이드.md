@@ -198,9 +198,36 @@ git pull && docker compose up -d --build
 
 ---
 
-## 11. 남은 과제 (배포 후)
+## 11. 도메인 & HTTPS (진행 중)
 
-- [ ] 도메인 구매 → A레코드를 IP에 연결 → 카카오에 도메인 등록
-- [ ] HTTPS(certbot/Let's Encrypt) 적용 — 현재 nginx는 80포트만. 도메인 확정 후 설정 추가 필요
-- [ ] 관리자 비밀번호 강력하게 설정 확인
-- [ ] (선택) SSH 소스를 내 IP 로 제한
+**구매 도메인: `jobmapkorea.com`** (Elastic IP `3.34.208.244`)
+
+### 11-1. DNS A레코드 연결 (도메인 구매처에서) ← 다음 단계
+구매처(가비아/Cloudflare 등) DNS 관리에서:
+| 유형 | 호스트/이름 | 값 |
+|---|---|---|
+| A | `@` (또는 jobmapkorea.com) | `3.34.208.244` |
+| A | `www` | `3.34.208.244` |
+
+- 반영에 수 분~수 시간(DNS 전파). `nslookup jobmapkorea.com` 으로 `3.34.208.244` 나오면 완료.
+- 앱 코드 수정 불필요: nginx `server_name _` (모든 호스트 응답), 프런트 `apiBase=""`(같은 오리진).
+
+### 11-2. 접속 확인
+- `http://jobmapkorea.com/` 열리면 성공.
+
+### 11-3. 카카오 콘솔에 도메인 추가
+- JavaScript SDK 도메인에 `http://jobmapkorea.com` (그리고 HTTPS 적용 후 `https://jobmapkorea.com`) 추가.
+
+### 11-4. HTTPS 적용 (방식 택1) — nginx 현재 80포트만
+- **A. certbot(Let's Encrypt)**: 서버에 인증서 발급 + nginx 443 설정. 무료·실제 종단간 TLS. (nginx 설정 추가 필요)
+- **B. Cloudflare**: 네임서버를 Cloudflare로 → SSL 자동. 서버 변경 최소. (Flexible SSL 은 CF↔origin 평문 주의)
+
+---
+
+## 12. 남은 과제 (기타)
+
+- [ ] 관리자 비밀번호 강력하게 설정 확인 (현재 `wkqdkqk123!`)
+- [ ] (선택) SSH 소스를 내 IP 로 제한 (현재 0.0.0.0/0)
+- [ ] 팝업 위젯 이식 (원 목표 — 다른 페이지에 삽입)
+- [ ] `고객요청사항_분석.md` 채우기 (엑셀 11건)
+- [ ] (선택) 카카오 REST 키로 좌표 정밀화, Flyway 마이그레이션
