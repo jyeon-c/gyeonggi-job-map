@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>임베드 데모 — 다른 페이지에 경기도 일자리맵 위젯 삽입</title>
+  <style>
+    body { margin:0; font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif; color:#2b3440; background:#fff; line-height:1.7; }
+    .host-header { background:#222d3a; color:#fff; padding:16px 28px; font-weight:700; font-size:18px; }
+    .host-main { max-width:760px; margin:0 auto; padding:48px 24px 120px; }
+    h1 { font-size:26px; letter-spacing:-.5px; }
+    p { color:#4d5a68; }
+    .note { margin-top:28px; padding:16px 18px; background:#f2f6fb; border:1px solid #dbe6f0; border-radius:10px; font-size:14px; }
+    code { background:#e8f1fb; padding:2px 6px; border-radius:5px; font-size:13px; }
+    pre { background:#1c2733; color:#e6edf5; padding:16px; border-radius:10px; overflow:auto; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="host-header">🏢 (예시) 어떤 회사 홈페이지</div>
+
+  <main class="host-main">
+    <h1>이 페이지는 "다른 사이트"입니다</h1>
+    <p>경기도 일자리맵과 무관한 임의의 호스트 페이지예요. 아래 스크립트 한 줄만 넣으면
+       우측 하단에 <strong>플로팅 버튼</strong>이 생기고, 누르면 채용공고 지도가 <strong>팝업</strong>으로 열립니다.</p>
+
+    <div class="note">
+      우측 하단의 <strong>파란 "채용공고 지도" 버튼</strong>을 눌러보세요 → 지도가 팝업으로 뜹니다.
+      (닫기: × 버튼 / 바깥 클릭 / ESC)
+    </div>
+
+    <h2>삽입 방법</h2>
+    <p>호스트 페이지 <code>&lt;body&gt;</code> 끝에 아래 한 줄만 추가:</p>
+    <pre>&lt;script src="https://jobmapkorea.com/embed.js"&gt;&lt;/script&gt;</pre>
+
+    <p>버튼 문구·위치·색상 커스터마이즈(선택):</p>
+    <pre>&lt;script src="https://jobmapkorea.com/embed.js"
+        data-label="일자리 찾기"
+        data-position="left"
+        data-color="#0f766e"&gt;&lt;/script&gt;</pre>
+  </main>
+
+  <!-- ↓ 실제 삽입 예시 (이 데모 파일과 같은 서버의 embed.js 사용) -->
+  <script src="embed.js"></script>
+</body>
+</html>

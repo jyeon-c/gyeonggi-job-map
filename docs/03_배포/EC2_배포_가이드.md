@@ -213,9 +213,22 @@ git pull && docker compose up -d --build
 
 ---
 
-## 12. 남은 과제
+## 12. 팝업 위젯 이식 (완료 ✅)
 
-- [ ] **팝업 위젯 이식** (원 목표 — 다른 페이지에 삽입) ← 다음 개발 작업
+원 목표인 "다른 페이지에 팝업 위젯으로 삽입"을 구현. 호스트 페이지에 스크립트 한 줄:
+
+```html
+<script src="https://jobmapkorea.com/embed.js"></script>
+```
+→ 우하단 플로팅 버튼 생성 → 클릭 시 지도 서비스가 팝업(모달 iframe)으로 열림.
+옵션: `data-label`(버튼 문구), `data-position`(left/right), `data-color`(색상).
+데모: `https://jobmapkorea.com/embed-demo.html`
+
+- `frontend/embed.js`(위젯), `frontend/embed-demo.html`(삽입 데모). nginx 가 자동 서빙(별도 설정 불필요).
+- iframe URL 은 스크립트 origin 에서 자동 계산(로컬 8087 / 운영 도메인 모두 대응).
+
+## 13. 남은 과제
+
 - [ ] (사용자) SSH 소스를 내 IP 로 제한 (현재 0.0.0.0/0) — AWS 보안그룹에서
 - [ ] (사용자) `고객요청사항_분석.md` 채우기 (엑셀 11건)
 - [ ] (선택) 관리자 비밀번호 더 강력하게
