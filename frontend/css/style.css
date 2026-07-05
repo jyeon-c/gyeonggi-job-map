@@ -369,11 +369,30 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--line);
 }
 
+.job-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .job-card__salary {
   font-size: 13px;
   font-weight: 700;
   color: var(--text-strong);
 }
+
+.job-card__link {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.job-card__link:hover { background: var(--primary-light); text-decoration: underline; }
 
 /* 로딩/에러 상태 (리스트 영역) */
 .list-state {
@@ -495,6 +514,17 @@ button { font-family: inherit; cursor: pointer; }
 
 .map-selected__title { font-size: 14.5px; font-weight: 700; color: var(--text-strong); margin-bottom: 2px; }
 .map-selected__info  { font-size: 12.5px; color: var(--text-muted); }
+
+.map-selected__link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.map-selected__link:hover { text-decoration: underline; }
 
 .map-selected__close {
   position: absolute;

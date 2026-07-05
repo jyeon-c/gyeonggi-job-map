@@ -243,7 +243,12 @@
             '<span>' + esc(job.education) + '</span>' +
             '<span>' + esc(job.empType) + '</span>' +
           '</div>' +
-          '<p class="job-card__salary">' + esc(job.salary) + '</p>' +
+          '<div class="job-card__foot">' +
+            '<p class="job-card__salary">' + esc(job.salary) + '</p>' +
+            (job.url
+              ? '<a class="job-card__link" href="' + esc(job.url) + '" target="_blank" rel="noopener">원문 보기 ↗</a>'
+              : '') +
+          '</div>' +
         '</li>'
       );
       $list.append($card);
@@ -394,11 +399,15 @@
     if (!job) { $box.prop("hidden", true).empty(); return; }
 
     var approx = job.geocodePrecision === "region_approx" ? ' · <em>위치 근사</em>' : '';
+    var link = job.url
+      ? '<a class="map-selected__link" href="' + esc(job.url) + '" target="_blank" rel="noopener">원문 보기 ↗</a>'
+      : '';
     $box.prop("hidden", false).html(
       '<button type="button" class="map-selected__close" aria-label="닫기">×</button>' +
       '<p class="map-selected__title">' + esc(job.title) + '</p>' +
       '<p class="map-selected__info">' + esc(job.company) + ' · ' + esc(regionShort(job.region)) +
-        ' · ' + esc(job.salary) + ' · ' + ddayLabel(ddayOf(job)) + approx + '</p>'
+        ' · ' + esc(job.salary) + ' · ' + ddayLabel(ddayOf(job)) + approx + '</p>' +
+      link
     );
   }
 
@@ -478,6 +487,11 @@
     $("#sortSelect").on("change", function () {
       state.sort = $(this).val();
       renderAll();
+    });
+
+    // 원문 링크 클릭은 카드 선택 토글을 막고 링크만 열리게 함
+    $("#jobList").on("click", ".job-card__link", function (e) {
+      e.stopPropagation();
     });
 
     // 카드 선택 (클릭/키보드)
