@@ -35,8 +35,9 @@ logs/
 infra/postgres-data/
 
 # === 데이터 파이프라인 파생 산출물 ===
-data/processed/
-# 단, jobs.json 은 배포 시드 데이터(백엔드 이미지에 포함)라 커밋한다. 캐시는 제외.
+# 디렉터리 자체가 아니라 내용물(*)을 무시해야 아래 jobs.json 예외가 동작한다.
+data/processed/*
+# 단, jobs.json 은 배포 시드 데이터(백엔드 이미지에 포함)라 커밋한다. 캐시 등은 제외.
 !data/processed/jobs.json
 
 # === 프런트 로컬 설정 (apply-env.ps1 생성) ===
