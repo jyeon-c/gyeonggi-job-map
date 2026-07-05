@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: jobmap-backend
+  profiles:
+    default: local
+
+server:
+  port: 8080
+
+---
+# ===== local: H2 인메모리 + jobs.json 자동 적재 =====
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:h2:mem:jobmap;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create
+    open-in-view: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+---
+# ===== prod: PostgreSQL/PostGIS (EC2 Docker Compose) =====
+# 비밀값은 환경변수 또는 gitignore 된 application-local.yml 로 주입한다. 하드코딩 금지.
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://db:5432/jobmap}
+    username: ${DB_USERNAME:jobmap}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
