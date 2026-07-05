@@ -6,12 +6,20 @@
 ## 진행 현황 (2026-07-05)
 - [x] EC2 인스턴스 생성 (`i-0b3b6aad5d317439d`, Ubuntu 24.04, t3.small)
 - [x] Elastic IP 할당·연결 → **3.34.208.244**
-- [ ] SSH 접속 (2단계) ← **다음 단계**
-- [ ] Docker/Compose 설치 + 스왑 (2단계)
-- [ ] 소스 clone + `.env` 작성 (3~4단계)
-- [ ] `docker compose up -d --build` (5단계)
-- [ ] 카카오 콘솔에 `http://3.34.208.244` 등록 (7단계)
-- [ ] 접속 확인 (6단계)
+- [x] SSH 접속 성공 (`ssh -i jobmap-key.pem ubuntu@3.34.208.244`)
+- [x] Docker/Compose 설치 완료 (Docker 29.6.1 / Compose v5.3.0)
+- [x] 스왑 2GB 설정
+- [x] GitHub 레포 **공개(Public) 전환** 후 소스 clone (`~/gyeonggi-job-map`)
+- [x] `.env` 작성 완료 (DB/관리자 비밀번호 설정, 카카오 JS 키)
+- [ ] `docker compose up -d --build` ← **다음 단계**
+- [ ] `docker compose ps` 로 3개 컨테이너 Up 확인
+- [ ] 카카오 콘솔 JavaScript SDK 도메인에 `http://3.34.208.244` 등록
+- [ ] `http://3.34.208.244/` 접속 확인 (+ `/admin.html` 로그인)
+
+> 메모
+> - 레포는 비밀정보가 커밋되지 않아 Public 전환해도 안전(.env·config.js gitignore).
+> - `.env` 는 서버 `~/gyeonggi-job-map/.env` 에만 존재(커밋 안 됨). 관리자 로그인: `admin` / (설정한 비번).
+> - GitHub 원격 remote 는 lowercase `jyeon-c` 로 접근됨.
 
 ---
 
