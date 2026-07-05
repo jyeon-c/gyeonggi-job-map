@@ -2,6 +2,7 @@ package com.gyeonggi.jobmap.web;
 
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -130,8 +131,27 @@ class JobPostingApiTest {
   }
 
   @Test
-  void 관리자_통계_집계() throws Exception {
+  void 관리자_통계는_인증없이_401() throws Exception {
     mockMvc.perform(get("/api/admin/stats"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void 관리자_통계는_잘못된_자격증명이면_401() throws Exception {
+    mockMvc.perform(get("/api/admin/stats").with(httpBasic("admin", "wrong")))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void 공개_API는_인증없이_접근가능() throws Exception {
+    // 관리자 인증을 켜도 일반 조회 API 는 공개여야 한다
+    mockMvc.perform(get("/api/jobs")).andExpect(status().isOk());
+    mockMvc.perform(get("/api/codes/career")).andExpect(status().isOk());
+  }
+
+  @Test
+  void 관리자_통계_집계() throws Exception {
+    mockMvc.perform(get("/api/admin/stats").with(httpBasic("admin", "admin1234")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.total").value(3))
         // 출처: 잡코리아 2, 고용24 1 (수 내림차순)

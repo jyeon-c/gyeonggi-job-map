@@ -28,6 +28,8 @@ services:
       DB_USERNAME: ${DB_USERNAME:-jobmap}
       DB_PASSWORD: ${DB_PASSWORD}
       JOBMAP_DATA_FILE: /app/data/jobs.json
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD 를 .env 에 설정하세요}
     depends_on:
       db:
         condition: service_healthy

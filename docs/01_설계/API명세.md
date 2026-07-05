@@ -67,7 +67,11 @@ Base URL: `/api`
   "byEmpType":  [{"key":"정규직","count":406}, ...]
 }
 ```
-프런트: `frontend/admin.html` (막대그래프). ⚠️ TODO: 운영 시 관리자 인증/인가 적용.
+프런트: `frontend/admin.html` (막대그래프 + 로그인 폼).
+
+**인증**: `/api/admin/**` 은 HTTP Basic 인증 필요(Spring Security). 자격증명은 환경변수
+`ADMIN_USERNAME`/`ADMIN_PASSWORD`(기본 admin/admin1234, 운영은 필수 변경). 나머지 API 는 공개.
+프런트는 로그인 폼 → base64 자격증명을 sessionStorage 에 보관하고 `Authorization: Basic` 헤더로 전송.
 
 ---
 

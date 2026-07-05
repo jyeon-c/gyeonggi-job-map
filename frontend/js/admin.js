@@ -1,12 +1,25 @@
 /**
- * 관리자 통계 페이지 — GET /api/admin/stats 를 받아 축별 막대그래프로 표시.
- * (요구사항 11번) 데이터 소스/오리진 규칙은 메인 화면과 동일하게 config.apiBase 사용.
+ * 관리자 통계 페이지 — GET /api/admin/stats(HTTP Basic 인증)를 받아 막대그래프로 표시.
+ * (요구사항 11번) 자격증명은 sessionStorage 에만 보관(탭 닫으면 소멸), 매 요청 Authorization 헤더로 전송.
  */
 (function ($) {
   "use strict";
 
   var API_BASE = (typeof APP_CONFIG !== "undefined" && APP_CONFIG.apiBase != null)
     ? APP_CONFIG.apiBase : "";
+
+  var AUTH_KEY = "jobmap_admin_auth"; // sessionStorage 에 저장하는 Basic 자격증명(base64)
+
+  function getAuth() {
+    try { return sessionStorage.getItem(AUTH_KEY); } catch (e) { return null; }
+  }
+  function setAuth(v) {
+    try { v ? sessionStorage.setItem(AUTH_KEY, v) : sessionStorage.removeItem(AUTH_KEY); } catch (e) {}
+  }
+  // 한글 등 비ASCII 자격증명도 안전하게 base64 인코딩
+  function basicToken(user, pass) {
+    return btoa(unescape(encodeURIComponent(user + ":" + pass)));
+  }
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -59,24 +72,83 @@
 
     $("#statsGrid").html(html);
     $("#adminState").prop("hidden", true);
+    $("#loginBox").prop("hidden", true);
+    $("#statsWrap").prop("hidden", false);
+    $("#logoutBtn").prop("hidden", false);
   }
 
-  function fail(err) {
+  // 로그인 화면 표시 (선택적으로 에러 메시지 노출)
+  function showLogin(showError) {
+    $("#statsWrap").prop("hidden", true);
+    $("#adminState").prop("hidden", true);
+    $("#logoutBtn").prop("hidden", true);
+    $("#loginBox").prop("hidden", false);
+    $("#loginError").prop("hidden", !showError);
+    $("#loginSubmit").prop("disabled", false).text("로그인");
+    $("#loginPass").val("");
+  }
+
+  function serverError() {
+    $("#loginBox").prop("hidden", true);
+    $("#statsWrap").prop("hidden", true);
     $("#adminState")
       .prop("hidden", false)
       .addClass("admin-state--error")
       .html("통계를 불러오지 못했습니다.<br><small>백엔드 서버(API)가 실행 중인지 확인해 주세요.</small>");
-    if (window.console) console.error("[admin] 통계 조회 실패:", err);
   }
 
-  $(function () {
-    fetch(API_BASE + "/api/admin/stats")
+  /**
+   * 통계 조회. auth 가 있으면 Authorization 헤더로 전송.
+   * onAuthFail: 401 처리 방식(초기 로드=조용히 로그인, 로그인 시도=에러 표시).
+   */
+  function loadStats(auth, onAuthFail) {
+    var headers = auth ? { Authorization: "Basic " + auth } : {};
+    return fetch(API_BASE + "/api/admin/stats", { headers: headers })
       .then(function (res) {
+        if (res.status === 401) { onAuthFail(); return null; }
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       })
-      .then(render)
-      .catch(fail);
+      .then(function (stats) { if (stats) render(stats); })
+      .catch(function (err) {
+        if (window.console) console.error("[admin] 통계 조회 실패:", err);
+        serverError();
+      });
+  }
+
+  $(function () {
+    // 로그인 제출 → 자격증명으로 조회 시도
+    $("#loginForm").on("submit", function (e) {
+      e.preventDefault();
+      var user = $("#loginUser").val().trim();
+      var pass = $("#loginPass").val();
+      if (!user || !pass) return;
+      var auth = basicToken(user, pass);
+      $("#loginSubmit").prop("disabled", true).text("확인 중…");
+      $("#loginError").prop("hidden", true);
+      loadStats(auth, function () {
+        setAuth(null);
+        showLogin(true); // 인증 실패 → 에러 표시
+      }).then(function () {
+        // 성공 시 render 에서 통계가 보이고, 이때만 자격증명 저장
+        if (!$("#statsWrap").prop("hidden")) setAuth(auth);
+      });
+    });
+
+    // 로그아웃
+    $("#logoutBtn").on("click", function () {
+      setAuth(null);
+      showLogin(false);
+    });
+
+    // 초기: 저장된 자격증명이 있으면 조회, 없거나 만료면 로그인 화면
+    var saved = getAuth();
+    if (saved) {
+      $("#adminState").prop("hidden", false);
+      loadStats(saved, function () { setAuth(null); showLogin(false); });
+    } else {
+      showLogin(false);
+    }
   });
 
 })(jQuery);

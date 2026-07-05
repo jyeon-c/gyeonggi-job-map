@@ -21,16 +21,38 @@
         <span class="logo__text">경기도 일자리맵</span>
       </a>
       <span class="admin-header__tag">관리자 통계</span>
+      <button type="button" class="admin-header__logout" id="logoutBtn" hidden>로그아웃</button>
       <a href="index.html" class="admin-header__back">← 지도 화면</a>
     </div>
   </header>
 
   <main class="admin-main" id="adminMain">
-    <p class="admin-total">전체 채용공고 <strong id="totalCount">–</strong>건</p>
 
-    <div class="admin-grid" id="statsGrid"><!-- 통계 카드 렌더링 --></div>
+    <!-- 로그인 폼 (미인증 시 표시) -->
+    <section class="admin-login" id="loginBox" hidden>
+      <h1 class="admin-login__title">관리자 로그인</h1>
+      <p class="admin-login__desc">통계 조회는 관리자 인증이 필요합니다.</p>
+      <form id="loginForm" class="admin-login__form" autocomplete="off">
+        <label class="admin-login__field">
+          <span>아이디</span>
+          <input type="text" id="loginUser" autocomplete="username" required>
+        </label>
+        <label class="admin-login__field">
+          <span>비밀번호</span>
+          <input type="password" id="loginPass" autocomplete="current-password" required>
+        </label>
+        <p class="admin-login__error" id="loginError" hidden>아이디 또는 비밀번호가 올바르지 않습니다.</p>
+        <button type="submit" class="admin-login__submit" id="loginSubmit">로그인</button>
+      </form>
+    </section>
 
-    <div class="admin-state" id="adminState">불러오는 중…</div>
+    <!-- 통계 (인증 후 표시) -->
+    <div class="admin-stats" id="statsWrap" hidden>
+      <p class="admin-total">전체 채용공고 <strong id="totalCount">–</strong>건</p>
+      <div class="admin-grid" id="statsGrid"></div>
+    </div>
+
+    <div class="admin-state" id="adminState" hidden>불러오는 중…</div>
   </main>
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

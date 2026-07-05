@@ -32,14 +32,90 @@ body.admin {
   border-radius: 999px;
 }
 
-.admin-header__back {
+.admin-header__logout {
   margin-left: auto;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-body);
+}
+.admin-header__logout[hidden] { display: none; }
+.admin-header__logout:hover { border-color: var(--danger); color: var(--danger); }
+
+.admin-header__back {
+  margin-left: 14px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-muted);
   text-decoration: none;
 }
+/* 로그아웃 버튼이 숨겨지면 back 링크가 오른쪽 끝으로 */
+.admin-header__logout[hidden] + .admin-header__back { margin-left: auto; }
 .admin-header__back:hover { color: var(--primary); }
+
+/* ----- 로그인 폼 ----- */
+.admin-login {
+  max-width: 360px;
+  margin: 48px auto 0;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 32px 28px;
+}
+.admin-login[hidden] { display: none; }
+
+.admin-login__title { font-size: 19px; font-weight: 800; color: var(--text-strong); margin-bottom: 6px; }
+.admin-login__desc { font-size: 13px; color: var(--text-muted); margin-bottom: 22px; }
+
+.admin-login__field { display: block; margin-bottom: 14px; }
+.admin-login__field span {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-body);
+  margin-bottom: 6px;
+}
+.admin-login__field input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-strong);
+  background: var(--bg-page);
+}
+.admin-login__field input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.admin-login__error { font-size: 12.5px; color: var(--danger); margin: 4px 0 12px; }
+.admin-login__error[hidden] { display: none; }
+
+.admin-login__submit {
+  width: 100%;
+  height: 44px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.admin-login__submit:hover { background: var(--primary-dark); }
+.admin-login__submit:disabled { opacity: 0.6; cursor: default; }
+
+.admin-stats[hidden] { display: none; }
 
 .admin-main {
   max-width: 1100px;

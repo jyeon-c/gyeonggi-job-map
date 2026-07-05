@@ -7,6 +7,13 @@ spring:
 server:
   port: 8080
 
+# 관리자(/api/admin/**) HTTP Basic 자격증명 — 모든 프로필 공통 기본값.
+# 운영은 반드시 환경변수 ADMIN_USERNAME / ADMIN_PASSWORD 로 강력한 값 주입.
+jobmap:
+  admin:
+    username: ${ADMIN_USERNAME:admin}
+    password: ${ADMIN_PASSWORD:admin1234}
+
 ---
 # ===== local: H2 인메모리 + jobs.json 자동 적재 =====
 spring:
