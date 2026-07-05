@@ -478,6 +478,85 @@ button { font-family: inherit; cursor: pointer; }
 .map-placeholder__notice strong { color: var(--text-body); }
 .map-placeholder__sub { font-size: 12.5px !important; }
 
+/* ----- 지도 컨트롤 (현재 위치 · 정책정보) ----- */
+.map-ctrls {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 40;
+  display: flex;
+  gap: 8px;
+}
+
+.map-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: var(--shadow-card);
+}
+.map-ctrl:hover { border-color: var(--primary); color: var(--primary-dark); }
+.map-ctrl.is-busy { opacity: .6; pointer-events: none; }
+.map-ctrl-wrap { position: relative; }
+
+.policy-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 210px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  padding: 8px;
+  z-index: 50;
+}
+.policy-menu[hidden] { display: none; }
+.policy-menu__head { font-size: 12px; font-weight: 700; color: var(--text-muted); padding: 4px 8px 8px; }
+.policy-menu a {
+  display: block;
+  padding: 9px 10px;
+  border-radius: 7px;
+  font-size: 13.5px;
+  color: var(--text-body);
+  text-decoration: none;
+}
+.policy-menu a:hover { background: var(--primary-light); color: var(--primary-dark); }
+
+/* 위치 동의 안내 */
+.geo-consent {
+  position: absolute;
+  left: 50%;
+  top: 68px;
+  transform: translateX(-50%);
+  z-index: 60;
+  width: min(360px, calc(100% - 32px));
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  padding: 16px 18px;
+}
+.geo-consent[hidden] { display: none; }
+.geo-consent__text { font-size: 13px; color: var(--text-body); margin-bottom: 12px; }
+.geo-consent__btns { display: flex; gap: 8px; justify-content: flex-end; }
+.geo-consent__ok, .geo-consent__no {
+  height: 34px; padding: 0 16px; border-radius: 8px; font-size: 13px; font-weight: 700; border: none;
+}
+.geo-consent__ok { background: var(--primary); color: #fff; }
+.geo-consent__ok:hover { background: var(--primary-dark); }
+.geo-consent__no { background: var(--bg-page); color: var(--text-body); }
+
+/* 내 위치 마커(폴백/카카오 공통 표시용 클래스) */
+.job-card__dist { color: var(--primary-dark); font-weight: 700; }
+
 /* 임시 마커 (카카오맵 연동 전 목데이터 미리보기) */
 .map-markers { position: absolute; inset: 0; }
 

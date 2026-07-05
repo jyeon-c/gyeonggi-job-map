@@ -73,7 +73,31 @@
   var jobsById = {};
   var loadSeq = 0; // 응답 경합 방지용 요청 시퀀스
 
+  var myLocation = null;   // {lat,lng} 현재 위치(#4). null 이면 거리 기능 비활성
+  var myMarker = null;     // 카카오 지도 위 '내 위치' 마커
+
   var TODAY = new Date("2026-07-05");
+
+  /* 두 좌표 간 거리(km) — 하버사인 (#6 거리 표시/정렬) */
+  function haversineKm(lat1, lng1, lat2, lng2) {
+    var R = 6371;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLng = (lng2 - lng1) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.sqrt(a));
+  }
+
+  function distanceKm(job) {
+    if (!myLocation || job.lat == null || job.lng == null) return null;
+    return haversineKm(myLocation.lat, myLocation.lng, job.lat, job.lng);
+  }
+
+  function distLabel(km) {
+    if (km == null) return "";
+    return km < 1 ? Math.round(km * 1000) + "m" : km.toFixed(1) + "km";
+  }
 
   /* ---------- 유틸 ---------- */
   function ddayOf(job) {
@@ -143,16 +167,28 @@
     return t;                                        // 진행중: 마감 빠른 순
   }
 
-  // 클라이언트 정렬(최신/마감임박)만 담당. 필터는 이미 서버에서 적용됨.
+  // 필터는 서버 처리. 여기서는 (1)마감 공고 미표시(#9) 후 (2)클라이언트 정렬.
   function getVisibleJobs() {
-    var sorted = jobs.slice();
-    sorted.sort(function (a, b) {
+    // #9 마감된 공고 자동 미표시 — 마감일이 지난 공고 제외(상시채용/진행중만)
+    var list = jobs.filter(function (j) {
+      var d = ddayOf(j);
+      return d === null || d >= 0;
+    });
+
+    list.sort(function (a, b) {
       if (state.sort === "deadline") {
         return deadlineSortKey(a) - deadlineSortKey(b);
       }
+      if (state.sort === "distance") {
+        // 거리 정보 없으면(좌표 null 또는 위치 미설정) 뒤로
+        var da = distanceKm(a); var db = distanceKm(b);
+        da = (da == null) ? Infinity : da;
+        db = (db == null) ? Infinity : db;
+        return da - db;
+      }
       return new Date(b.postedAt) - new Date(a.postedAt); // latest
     });
-    return sorted;
+    return list;
   }
 
   // 조건 변경 시: API 재조회 → 상태 갱신 → 전체 리렌더. 경합 응답은 최신 요청만 반영.
@@ -249,6 +285,9 @@
             '<span>' + esc(job.career) + '</span>' +
             '<span>' + esc(job.education) + '</span>' +
             '<span>' + esc(job.empType) + '</span>' +
+            (distanceKm(job) != null
+              ? '<span class="job-card__dist">' + distLabel(distanceKm(job)) + '</span>'
+              : '') +
           '</div>' +
           '<div class="job-card__foot">' +
             '<p class="job-card__salary">' + esc(job.salary) + '</p>' +
@@ -302,6 +341,54 @@
     // 현재 결과 전체가 보이도록 최초 1회 범위 맞춤
     fitMapToJobs();
     renderMarkers(getVisibleJobs());
+  }
+
+  /* ---------- #4 현재 위치 기능 ---------- */
+  // 위치 확보 성공 시: 상태 저장 → 지도 이동/마커 → 거리순 정렬로 전환 → 재렌더
+  function applyMyLocation(lat, lng) {
+    myLocation = { lat: lat, lng: lng };
+
+    if (useKakao) {
+      var pos = new kakao.maps.LatLng(lat, lng);
+      if (myMarker) myMarker.setMap(null);
+      myMarker = new kakao.maps.Marker({
+        map: kakaoMap,
+        position: pos,
+        image: markerImage("#2563eb", true),
+        zIndex: 30,
+        title: "내 위치"
+      });
+      kakaoMap.setLevel(7);
+      kakaoMap.panTo(pos);
+    }
+
+    // 주변 일자리 우선 보이도록 거리순으로 전환
+    state.sort = "distance";
+    $("#sortSelect").val("distance");
+    renderAll();
+  }
+
+  function locate() {
+    if (!navigator.geolocation) {
+      alert("이 브라우저는 위치 기능을 지원하지 않습니다.");
+      return;
+    }
+    var $btn = $("#btnLocate").addClass("is-busy");
+    navigator.geolocation.getCurrentPosition(
+      function (p) {
+        $btn.removeClass("is-busy");
+        applyMyLocation(p.coords.latitude, p.coords.longitude);
+      },
+      function (err) {
+        $btn.removeClass("is-busy");
+        // #4 오차/거부 안내
+        var msg = err.code === err.PERMISSION_DENIED
+          ? "위치 접근이 거부되었습니다. 브라우저 주소창의 위치 권한을 허용해 주세요."
+          : "현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+        alert(msg);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
   }
 
   /* 현재 결과 전체가 보이도록 지도 범위 조정 (컨테이너가 보이는 상태에서 호출해야 정확) */
@@ -510,6 +597,10 @@
     // 정렬 (클라이언트 정렬 — 재조회 불필요)
     $("#sortSelect").on("change", function () {
       state.sort = $(this).val();
+      // 가까운 순인데 위치가 없으면 위치 동의 안내로 유도
+      if (state.sort === "distance" && !myLocation) {
+        $("#geoConsent").prop("hidden", false);
+      }
       renderAll();
     });
 
@@ -550,6 +641,26 @@
         fitMapToJobs();
       }
     });
+
+    // #4 현재 위치 — 최초엔 위치 동의 안내(#10), 이후엔 바로 실행
+    $("#btnLocate").on("click", function () {
+      if (myLocation) { locate(); return; }              // 이미 동의/사용한 적 있으면 바로
+      $("#geoConsent").prop("hidden", false);
+    });
+    $("#geoAgree").on("click", function () {
+      $("#geoConsent").prop("hidden", true);
+      locate();
+    });
+    $("#geoCancel").on("click", function () {
+      $("#geoConsent").prop("hidden", true);
+    });
+
+    // #8 정책정보 드롭다운
+    $("#btnPolicy").on("click", function (e) {
+      e.stopPropagation();
+      $("#policyMenu").prop("hidden", function (i, v) { return !v; });
+    });
+    $(document).on("click", function () { $("#policyMenu").prop("hidden", true); });
   }
 
   /* ---------- 초기화 ---------- */

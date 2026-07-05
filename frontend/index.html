@@ -57,6 +57,7 @@
         <select class="list-head__sort" id="sortSelect" aria-label="정렬 기준">
           <option value="latest">최신 등록순</option>
           <option value="deadline">마감 임박순</option>
+          <option value="distance">가까운 순</option>
         </select>
       </div>
 
@@ -82,8 +83,45 @@
         <div class="map-markers" id="mapMarkers"><!-- 임시 마커 렌더링 영역 --></div>
       </div>
 
+      <!-- 지도 우상단 컨트롤: 현재 위치 · 정책정보 -->
+      <div class="map-ctrls">
+        <button type="button" class="map-ctrl" id="btnLocate" title="현재 위치">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <span>현재 위치</span>
+        </button>
+
+        <div class="map-ctrl-wrap" id="policyWrap">
+          <button type="button" class="map-ctrl" id="btnPolicy" title="일자리 정책 정보">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+              <path d="M12 3 4 6v6c0 4.5 3.4 7.9 8 9 4.6-1.1 8-4.5 8-9V6l-8-3z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+              <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>정책정보</span>
+          </button>
+          <div class="policy-menu" id="policyMenu" hidden>
+            <p class="policy-menu__head">경기도 일자리 지원정책</p>
+            <a href="https://www.jobaba.net/policy/list.do" target="_blank" rel="noopener">청년 취업지원 정책 ↗</a>
+            <a href="https://www.jobaba.net/edu/list.do" target="_blank" rel="noopener">직업훈련 · 교육 ↗</a>
+            <a href="https://www.jobaba.net/startup/list.do" target="_blank" rel="noopener">창업 지원 ↗</a>
+            <a href="https://www.jobaba.net" target="_blank" rel="noopener">잡아바 일자리 플랫폼 ↗</a>
+          </div>
+        </div>
+      </div>
+
       <!-- 지도 위 선택 공고 미니 카드 -->
       <div class="map-selected" id="mapSelected" hidden></div>
+
+      <!-- 위치 동의 안내 (최초 현재위치 클릭 시) -->
+      <div class="geo-consent" id="geoConsent" hidden>
+        <p class="geo-consent__text">현재 위치를 사용하려면 브라우저의 <strong>위치 정보 접근 허용</strong>이 필요합니다. 위치 정보는 지도 표시·주변 공고 정렬에만 사용되며 저장되지 않습니다.</p>
+        <div class="geo-consent__btns">
+          <button type="button" id="geoAgree" class="geo-consent__ok">위치 사용</button>
+          <button type="button" id="geoCancel" class="geo-consent__no">취소</button>
+        </div>
+      </div>
     </section>
   </main>
 
