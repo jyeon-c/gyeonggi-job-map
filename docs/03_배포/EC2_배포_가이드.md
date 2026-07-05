@@ -198,36 +198,26 @@ git pull && docker compose up -d --build
 
 ---
 
-## 11. 도메인 & HTTPS (진행 중)
+## 11. 도메인 & HTTPS (완료 ✅)
 
-**구매 도메인: `jobmapkorea.com`** (Elastic IP `3.34.208.244`)
+**도메인: `jobmapkorea.com` · Cloudflare · HTTPS 적용 완료 → https://jobmapkorea.com/**
 
-### 11-1. DNS A레코드 연결 (도메인 구매처에서) ← 다음 단계
-구매처(가비아/Cloudflare 등) DNS 관리에서:
-| 유형 | 호스트/이름 | 값 |
-|---|---|---|
-| A | `@` (또는 jobmapkorea.com) | `3.34.208.244` |
-| A | `www` | `3.34.208.244` |
+- DNS: Cloudflare A레코드 `jobmapkorea.com`/`www` → `3.34.208.244` (프록시 ON, 오렌지 구름)
+- HTTPS: **Cloudflare 방식**으로 해결 (certbot 불필요). SSL/TLS 모드 = **Flexible**
+  (브라우저↔Cloudflare 는 HTTPS, Cloudflare↔origin 은 HTTP:80. origin 이 80포트만 열려 있어 Flexible)
+- 카카오 JavaScript SDK 도메인에 `https://jobmapkorea.com` 등록 → 지도 표시 정상
+- 앱 코드 수정 없이 동작: nginx `server_name _`, 프런트 `apiBase=""`(같은 오리진)
 
-- 반영에 수 분~수 시간(DNS 전파). `nslookup jobmapkorea.com` 으로 `3.34.208.244` 나오면 완료.
-- 앱 코드 수정 불필요: nginx `server_name _` (모든 호스트 응답), 프런트 `apiBase=""`(같은 오리진).
-
-### 11-2. 접속 확인
-- `http://jobmapkorea.com/` 열리면 성공.
-
-### 11-3. 카카오 콘솔에 도메인 추가
-- JavaScript SDK 도메인에 `http://jobmapkorea.com` (그리고 HTTPS 적용 후 `https://jobmapkorea.com`) 추가.
-
-### 11-4. HTTPS 적용 (방식 택1) — nginx 현재 80포트만
-- **A. certbot(Let's Encrypt)**: 서버에 인증서 발급 + nginx 443 설정. 무료·실제 종단간 TLS. (nginx 설정 추가 필요)
-- **B. Cloudflare**: 네임서버를 Cloudflare로 → SSL 자동. 서버 변경 최소. (Flexible SSL 은 CF↔origin 평문 주의)
+> 향후 보안 강화(선택): origin 을 Cloudflare IP 대역만 허용(보안그룹) + SSL 모드 Full(origin 인증서).
+> 지금은 실습/데모 수준으로 Flexible 로 충분.
 
 ---
 
-## 12. 남은 과제 (기타)
+## 12. 남은 과제
 
-- [ ] 관리자 비밀번호 강력하게 설정 확인 (현재 `wkqdkqk123!`)
-- [ ] (선택) SSH 소스를 내 IP 로 제한 (현재 0.0.0.0/0)
-- [ ] 팝업 위젯 이식 (원 목표 — 다른 페이지에 삽입)
-- [ ] `고객요청사항_분석.md` 채우기 (엑셀 11건)
-- [ ] (선택) 카카오 REST 키로 좌표 정밀화, Flyway 마이그레이션
+- [ ] **팝업 위젯 이식** (원 목표 — 다른 페이지에 삽입) ← 다음 개발 작업
+- [ ] (사용자) SSH 소스를 내 IP 로 제한 (현재 0.0.0.0/0) — AWS 보안그룹에서
+- [ ] (사용자) `고객요청사항_분석.md` 채우기 (엑셀 11건)
+- [ ] (선택) 관리자 비밀번호 더 강력하게
+- [ ] (선택) 카카오 REST 키로 좌표 정밀화 (KAKAO_REST_API_KEY 필요)
+- [ ] (선택) Flyway 마이그레이션 / GitHub Actions 자동 배포
