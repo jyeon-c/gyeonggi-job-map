@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>경기도 일자리맵 — 관리자 통계</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin">
+
+  <header class="admin-header">
+    <div class="admin-header__inner">
+      <a href="index.html" class="logo">
+        <span class="logo__pin" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+            <path d="M12 2C7.6 2 4 5.6 4 10c0 5.6 7 11.4 7.6 11.9a.6.6 0 0 0 .8 0C13 21.4 20 15.6 20 10c0-4.4-3.6-8-8-8z" fill="currentColor"/>
+            <circle cx="12" cy="10" r="3.2" fill="#fff"/>
+          </svg>
+        </span>
+        <span class="logo__text">경기도 일자리맵</span>
+      </a>
+      <span class="admin-header__tag">관리자 통계</span>
+      <a href="index.html" class="admin-header__back">← 지도 화면</a>
+    </div>
+  </header>
+
+  <main class="admin-main" id="adminMain">
+    <p class="admin-total">전체 채용공고 <strong id="totalCount">–</strong>건</p>
+
+    <div class="admin-grid" id="statsGrid"><!-- 통계 카드 렌더링 --></div>
+
+    <div class="admin-state" id="adminState">불러오는 중…</div>
+  </main>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

@@ -50,10 +50,24 @@ Base URL: `/api`
 ### GET /api/codes/{group}
 예: `/api/codes/career`, `/api/codes/education`, `/api/codes/employment-type`
 
-## 관리자 (선택 과제, 11번)
+## 관리자 (요구사항 11번) — 구현 완료
 
 ### GET /api/admin/stats
-지역별/출처별/직종별 공고 수 집계
+출처별/지역별/경력별/학력별/고용형태별 공고 수 집계.
+(원 명세의 '직종별'은 현재 데이터셋에 직종 컬럼이 없어 제외, 대신 경력/학력/고용형태 축 추가)
+
+응답 예시
+```json
+{
+  "total": 527,
+  "bySource":   [{"key":"잡코리아","count":500},{"key":"고용24","count":27}],
+  "byRegion":   [{"key":"성남시","count":72}, ...],  // 시·군 상위 15
+  "byCareer":   [{"key":"무관","count":317}, ...],
+  "byEducation":[{"key":"무관","count":334}, ...],
+  "byEmpType":  [{"key":"정규직","count":406}, ...]
+}
+```
+프런트: `frontend/admin.html` (막대그래프). ⚠️ TODO: 운영 시 관리자 인증/인가 적용.
 
 ---
 

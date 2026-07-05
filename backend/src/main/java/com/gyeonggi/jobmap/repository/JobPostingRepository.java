@@ -55,4 +55,28 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
 
   @Query("select distinct j.sourceName from JobPosting j order by j.sourceName")
   List<String> findDistinctSources();
+
+  /* ---------- 관리자 통계 집계 (요구사항 11번) ---------- */
+
+  /** group by 결과 투영: key(구분값) + count(공고 수) */
+  interface KeyCount {
+    String getKey();
+    long getCount();
+  }
+
+  @Query("select j.sourceName as key, count(j) as count from JobPosting j group by j.sourceName order by count(j) desc")
+  List<KeyCount> countBySource();
+
+  @Query("select j.career as key, count(j) as count from JobPosting j group by j.career order by count(j) desc")
+  List<KeyCount> countByCareer();
+
+  @Query("select j.education as key, count(j) as count from JobPosting j group by j.education order by count(j) desc")
+  List<KeyCount> countByEducation();
+
+  @Query("select j.empType as key, count(j) as count from JobPosting j group by j.empType order by count(j) desc")
+  List<KeyCount> countByEmpType();
+
+  /** 지역은 원본 표기가 다양('성남시 분당구', '의정부시, 서울…') → 서비스에서 시·군으로 합산 */
+  @Query("select j.region as key, count(j) as count from JobPosting j group by j.region")
+  List<KeyCount> countByRegionRaw();
 }

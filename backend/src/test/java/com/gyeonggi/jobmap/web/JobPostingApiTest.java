@@ -128,4 +128,20 @@ class JobPostingApiTest {
 
     mockMvc.perform(get("/api/codes/unknown")).andExpect(status().isNotFound());
   }
+
+  @Test
+  void 관리자_통계_집계() throws Exception {
+    mockMvc.perform(get("/api/admin/stats"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.total").value(3))
+        // 출처: 잡코리아 2, 고용24 1 (수 내림차순)
+        .andExpect(jsonPath("$.bySource[0].key").value("잡코리아"))
+        .andExpect(jsonPath("$.bySource[0].count").value(2))
+        .andExpect(jsonPath("$.bySource[1].key").value("고용24"))
+        // 지역: 3개 시·군 각 1건
+        .andExpect(jsonPath("$.byRegion", hasSize(3)))
+        // 경력: 무관 2, 경력 1
+        .andExpect(jsonPath("$.byCareer[0].key").value("무관"))
+        .andExpect(jsonPath("$.byCareer[0].count").value(2));
+  }
 }
