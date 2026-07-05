@@ -1,6 +1,7 @@
 # === 민감 정보 / 환경설정 ===
 .env
 .env.*
+!.env.example
 application-local.yml
 application-local.yaml
 **/src/main/resources/application-secret.yml

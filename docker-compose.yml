@@ -1,0 +1,50 @@
+# 경기도 일자리맵 — EC2 단일 인스턴스 통합 구성 (nginx + backend + db)
+# 사용: 저장소 루트에 .env 작성(.env.example 참고) 후  `docker compose up -d --build`
+# 접속: http://<EC2-IP>/  (nginx 80 → 정적 프런트, /api → backend 프록시)
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${DB_NAME:-jobmap}
+      POSTGRES_USER: ${DB_USERNAME:-jobmap}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD 를 .env 에 설정하세요}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-jobmap} -d ${DB_NAME:-jobmap}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-jobmap}
+      DB_USERNAME: ${DB_USERNAME:-jobmap}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JOBMAP_DATA_FILE: /app/data/jobs.json
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    build:
+      context: .
+      dockerfile: infra/nginx/Dockerfile
+    environment:
+      KAKAO_JS_KEY: ${KAKAO_JS_KEY}
+      API_BASE: ""   # 같은 오리진 — nginx 가 /api 를 backend 로 프록시
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:

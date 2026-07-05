@@ -15,20 +15,25 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
- * local 프로필 전용: 데이터 파이프라인 산출물(data/processed/jobs.json)을
- * 기동 시 H2 인메모리 DB에 적재한다.
- * 운영(prod)에서는 지오코딩 배치가 PostgreSQL에 직접 적재할 예정이므로 비활성.
+ * 데이터 파이프라인 산출물(jobs.json)을 기동 시 DB에 적재한다.
+ * <ul>
+ *   <li>local: H2 인메모리 — {@code ../data/processed/jobs.json}</li>
+ *   <li>prod : PostgreSQL — 컨테이너에 담긴 {@code /app/data/jobs.json}
+ *       (경로는 환경변수 {@code JOBMAP_DATA_FILE} 로 주입)</li>
+ * </ul>
+ * 이미 데이터가 있으면 건너뛰므로 재기동 시 안전하다. 테스트(test)에서는
+ * 각 테스트가 직접 시드하므로 비활성화한다.
  */
 @Slf4j
 @Component
-@Profile("local")
+@Profile("!test")
 @RequiredArgsConstructor
 public class JobDataLoader implements CommandLineRunner {
 
   private final JobPostingRepository repository;
   private final ObjectMapper objectMapper;
 
-  /** backend/ 에서 기동하는 것을 기본 가정 (IntelliJ 실행 구성 포함) */
+  /** backend/ 에서 기동하는 로컬 기준 기본값. 컨테이너는 JOBMAP_DATA_FILE 로 덮어쓴다. */
   @Value("${jobmap.data-file:../data/processed/jobs.json}")
   private String dataFile;
 
