@@ -442,6 +442,15 @@
     renderMapSelected();
   }
 
+  /* fixed 드롭다운을 버튼 바로 아래에 배치 (오른쪽 화면 밖으로 나가면 왼쪽으로 보정) */
+  function positionChipMenu($chip, btn) {
+    var $menu = $chip.find(".filter-chip__menu");
+    var rect = btn.getBoundingClientRect();
+    var menuW = $menu.outerWidth();
+    var left = Math.min(rect.left, window.innerWidth - menuW - 8);
+    $menu.css({ left: Math.max(8, left) + "px", top: (rect.bottom + 6) + "px" });
+  }
+
   /* ---------- 이벤트 바인딩 ---------- */
   function bindEvents() {
     // 검색 (서버 재조회)
@@ -458,7 +467,15 @@
       var $chip = $(this).closest(".filter-chip");
       var wasOpen = $chip.hasClass("is-open");
       $(".filter-chip").removeClass("is-open");
-      if (!wasOpen) $chip.addClass("is-open");
+      if (!wasOpen) {
+        $chip.addClass("is-open");
+        positionChipMenu($chip, this);
+      }
+    });
+
+    // 스크롤/리사이즈 시 fixed 드롭다운 위치가 어긋나므로 닫는다
+    $(window).on("resize scroll", function () {
+      $(".filter-chip.is-open").removeClass("is-open");
     });
 
     // 필터 옵션 선택 (서버 재조회)
