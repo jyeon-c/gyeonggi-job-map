@@ -1,7 +1,7 @@
 /**
  * 경기도 일자리맵 — 메인 화면 동작
- * 검색/필터/정렬 → 리스트 & 마커 렌더링, 카드-마커 선택 동기화.
- * 지도는 카카오맵 SDK 연동 전이므로 좌표를 화면 비율로 환산한 임시 마커로 표시.
+ * 백엔드 /api/jobs 에서 공고를 조회해 리스트 & 지도 마커 렌더링, 카드-마커 선택 동기화.
+ * 필터/키워드는 서버 처리, 정렬은 클라이언트 처리. 카카오 SDK 미로드 시 플레이스홀더 폴백.
  */
 (function ($) {
   "use strict";
@@ -55,6 +55,11 @@
   var useKakao = false;      // false 면 플레이스홀더 폴백으로 동작
   var MARKER_COLORS = { public: "#0f766e", private: "#1a73d1", selected: "#dc2626" };
 
+  /* ---------- API ---------- */
+  // 운영은 nginx 가 같은 오리진에서 /api 를 프록시하므로 apiBase="" 가 기본.
+  var API_BASE = (typeof APP_CONFIG !== "undefined" && APP_CONFIG.apiBase != null)
+    ? APP_CONFIG.apiBase : "";
+
   /* ---------- 상태 ---------- */
   var state = {
     keyword: "",
@@ -62,6 +67,11 @@
     sort: "latest",
     selectedId: null
   };
+
+  // 현재 조건으로 API 에서 받아온 공고 목록(정렬 전 원본)과 id 색인
+  var jobs = [];
+  var jobsById = {};
+  var loadSeq = 0; // 응답 경합 방지용 요청 시퀀스
 
   var TODAY = new Date("2026-07-05");
 
@@ -95,34 +105,82 @@
     });
   }
 
-  /* ---------- 필터링/정렬 ---------- */
+  /* ---------- API 조회 ---------- */
+  // 필터/키워드는 서버에서 처리한다. 목록 UI 는 페이징 없이 전체를 보여주므로
+  // size=100 으로 페이지를 끝까지 순회해 조건에 맞는 공고를 모두 모은다.
+  function fetchJobs() {
+    var params = new URLSearchParams();
+    if (state.filters.source) params.set("source", state.filters.source);
+    if (state.filters.career) params.set("career", state.filters.career);
+    if (state.filters.education) params.set("edu", state.filters.education);
+    if (state.filters.empType) params.set("employmentType", state.filters.empType);
+    var kw = state.keyword.trim();
+    if (kw) params.set("keyword", kw);
+    params.set("size", "100");
+
+    function fetchPage(page, acc) {
+      params.set("page", String(page));
+      return fetch(API_BASE + "/api/jobs?" + params.toString())
+        .then(function (res) {
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          return res.json();
+        })
+        .then(function (data) {
+          acc = acc.concat(data.content);
+          if (page + 1 < data.totalPages) return fetchPage(page + 1, acc);
+          return acc;
+        });
+    }
+    return fetchPage(0, []);
+  }
+
+  // 클라이언트 정렬(최신/마감임박)만 담당. 필터는 이미 서버에서 적용됨.
   function getVisibleJobs() {
-    var kw = state.keyword.trim().toLowerCase();
-
-    var jobs = JOBS_DATA.filter(function (job) {
-      if (state.filters.source && job.source !== state.filters.source) return false;
-      if (state.filters.career && job.career !== state.filters.career) return false;
-      if (state.filters.education && job.education !== state.filters.education) return false;
-      if (state.filters.empType && job.empType !== state.filters.empType) return false;
-
-      if (kw) {
-        var haystack = (job.title + " " + job.company + " " + job.region).toLowerCase();
-        if (haystack.indexOf(kw) === -1) return false;
-      }
-      return true;
-    });
-
-    jobs.sort(function (a, b) {
+    var sorted = jobs.slice();
+    sorted.sort(function (a, b) {
       if (state.sort === "deadline") {
-        // 상시채용(deadline 없음)은 뒤로
         var da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
         var db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
         return da - db;
       }
       return new Date(b.postedAt) - new Date(a.postedAt); // latest
     });
+    return sorted;
+  }
 
-    return jobs;
+  // 조건 변경 시: API 재조회 → 상태 갱신 → 전체 리렌더. 경합 응답은 최신 요청만 반영.
+  function reloadJobs() {
+    var seq = ++loadSeq;
+    setListLoading();
+    fetchJobs()
+      .then(function (result) {
+        if (seq !== loadSeq) return; // 더 최신 요청이 진행 중이면 무시
+        jobs = result;
+        jobsById = {};
+        jobs.forEach(function (j) { jobsById[j.id] = j; });
+        renderAll();
+        if (useKakao) fitMapToJobs();
+      })
+      .catch(function (err) {
+        if (seq !== loadSeq) return;
+        setListError(err);
+      });
+  }
+
+  function setListLoading() {
+    $("#listEmpty").prop("hidden", true);
+    $("#jobList").html('<li class="list-state">불러오는 중…</li>');
+  }
+
+  function setListError(err) {
+    jobs = []; jobsById = {};
+    $("#resultCount").text(0);
+    $("#mapMarkers").empty();
+    $("#jobList").html(
+      '<li class="list-state list-state--error">채용공고를 불러오지 못했습니다.<br>' +
+      '<small>백엔드 서버(API)가 실행 중인지 확인해 주세요.</small></li>'
+    );
+    if (window.console) console.error("[jobmap] API 조회 실패:", err);
   }
 
   /* ---------- 렌더링: 필터 칩 ---------- */
@@ -332,7 +390,7 @@
       $box.prop("hidden", true).empty();
       return;
     }
-    var job = JOBS_DATA.filter(function (j) { return j.id === state.selectedId; })[0];
+    var job = jobsById[state.selectedId];
     if (!job) { $box.prop("hidden", true).empty(); return; }
 
     var approx = job.geocodePrecision === "region_approx" ? ' · <em>위치 근사</em>' : '';
@@ -377,12 +435,12 @@
 
   /* ---------- 이벤트 바인딩 ---------- */
   function bindEvents() {
-    // 검색
+    // 검색 (서버 재조회)
     $("#searchForm").on("submit", function (e) {
       e.preventDefault();
       state.keyword = $("#searchInput").val();
       state.selectedId = null;
-      renderAll();
+      reloadJobs();
     });
 
     // 필터 칩 열기/닫기
@@ -394,12 +452,12 @@
       if (!wasOpen) $chip.addClass("is-open");
     });
 
-    // 필터 옵션 선택
+    // 필터 옵션 선택 (서버 재조회)
     $("#filterBar").on("click", ".filter-chip__option", function () {
       var key = $(this).closest(".filter-chip").data("key");
       state.filters[key] = $(this).data("value");
       state.selectedId = null;
-      renderAll();
+      reloadJobs();
     });
 
     // 바깥 클릭 시 드롭다운 닫기
@@ -407,16 +465,16 @@
       $(".filter-chip").removeClass("is-open");
     });
 
-    // 필터/검색 초기화
+    // 필터/검색 초기화 (서버 재조회)
     $("#filterReset").on("click", function () {
       state.keyword = "";
       $("#searchInput").val("");
       FILTER_DEFS.forEach(function (d) { state.filters[d.key] = ""; });
       state.selectedId = null;
-      renderAll();
+      reloadJobs();
     });
 
-    // 정렬
+    // 정렬 (클라이언트 정렬 — 재조회 불필요)
     $("#sortSelect").on("change", function () {
       state.sort = $(this).val();
       renderAll();
@@ -459,7 +517,8 @@
   /* ---------- 초기화 ---------- */
   $(function () {
     bindEvents();
-    renderAll();
+    renderFilterBar(); // 필터 칩은 데이터와 무관하게 먼저 그려둔다
+    reloadJobs();      // API 에서 초기 목록 로드
     loadKakaoSdk();
   });
 

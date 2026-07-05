@@ -263,13 +263,10 @@ foreach ($r in $jk) {
 }
 
 # ---------- 산출물 저장 ----------
+# 산출물은 backend 시딩(JobDataLoader) 및 prod 이미지가 소비하는 jobs.json 단일 파일.
+# (프런트는 더 이상 정적 데이터를 쓰지 않고 /api/jobs 로 조회한다)
 $json = ConvertTo-Json $jobs -Depth 4 -Compress
 [System.IO.File]::WriteAllText((Join-Path $outDir "jobs.json"), $json, $utf8NoBom)
-
-$jsContent = "// 자동 생성 파일 — 수정 금지. 재생성: powershell -File scripts\build-jobs-data.ps1`r`n" +
-             "// 원천: data/채용공고_고용24.csv(경기 필터) + data/채용공고_잡코리아.csv + 기업주소 조인`r`n" +
-             "var JOBS_DATA = $json;`r`n"
-[System.IO.File]::WriteAllText((Join-Path $root "frontend\js\jobs-data.js"), $jsContent, $utf8NoBom)
 
 # 지오코딩 캐시 저장
 if ($geoCache.Count -gt 0) {
@@ -287,4 +284,4 @@ Write-Host "잡코리아 정확 주소 확보: $jkExactAddr/$($jk.Count)"
 Write-Host "좌표: exact $exact / region_approx $approx / 없음 $noCoord"
 if (-not $kakaoKey) { Write-Host "※ KAKAO_REST_API_KEY 미설정 → 전부 시군 중심점 근사. 키 설정 후 재실행하면 정확 좌표로 갱신됨" }
 else { Write-Host "카카오 API 호출: $script:apiCalls 건 (캐시 재사용 포함 총 $($geoCache.Count)건 캐시)" }
-Write-Host "산출물: data\processed\jobs.json, frontend\js\jobs-data.js"
+Write-Host "산출물: data\processed\jobs.json (백엔드 시딩용)"

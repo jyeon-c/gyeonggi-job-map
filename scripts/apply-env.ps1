@@ -24,9 +24,14 @@ foreach ($line in (Get-Content $envPath -Encoding UTF8)) {
 $jsKey = $vars["KAKAO_JS_KEY"]
 if (-not $jsKey) { Write-Warning "KAKAO_JS_KEY 가 .env 에 없습니다. 지도 SDK 없이 플레이스홀더로 동작합니다." }
 
+# 로컬 개발 기본값: 백엔드는 8080 포트. .env 에 API_BASE 가 있으면 그 값을 사용.
+$apiBase = $vars["API_BASE"]
+if ($null -eq $apiBase) { $apiBase = "http://localhost:8080" }
+
 $content = "// 자동 생성 파일 — 커밋 금지. 재생성: powershell -File scripts\apply-env.ps1`r`n" +
            "var APP_CONFIG = {`r`n" +
-           "  kakaoJsKey: `"$jsKey`"`r`n" +
+           "  kakaoJsKey: `"$jsKey`",`r`n" +
+           "  apiBase: `"$apiBase`"`r`n" +
            "};`r`n"
 
 $outPath = Join-Path $root "frontend\js\config.js"
