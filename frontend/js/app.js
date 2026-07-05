@@ -134,14 +134,21 @@
     return fetchPage(0, []);
   }
 
+  /* 마감임박순 정렬키: 진행중(마감 임박한 순) → 상시채용 → 이미 마감(맨 뒤).
+     이미 마감된 공고가 '마감 임박순' 맨 위로 올라오는 문제를 막는다. */
+  function deadlineSortKey(job) {
+    if (!job.deadline) return 4e15;                 // 상시채용: 진행중 뒤
+    var t = new Date(job.deadline).getTime();
+    if (ddayOf(job) < 0) return 8e15 + t;           // 이미 마감: 최하단(그 안에선 최근 마감 순)
+    return t;                                        // 진행중: 마감 빠른 순
+  }
+
   // 클라이언트 정렬(최신/마감임박)만 담당. 필터는 이미 서버에서 적용됨.
   function getVisibleJobs() {
     var sorted = jobs.slice();
     sorted.sort(function (a, b) {
       if (state.sort === "deadline") {
-        var da = a.deadline ? new Date(a.deadline).getTime() : Infinity;
-        var db = b.deadline ? new Date(b.deadline).getTime() : Infinity;
-        return da - db;
+        return deadlineSortKey(a) - deadlineSortKey(b);
       }
       return new Date(b.postedAt) - new Date(a.postedAt); // latest
     });
