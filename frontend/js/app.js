@@ -78,6 +78,10 @@
   var searchMarker = null; // #5 주소/장소 검색 결과 마커
   var RECENT_KEY = "jobmap_recent_search"; // #5 최근 검색 저장(localStorage)
 
+  var viewBounds = null;   // #9 현재 지도 화면 범위(kakao LatLngBounds). null 이면 전체
+  var RENDER_STEP = 30;    // #9 무한스크롤 1회 렌더 개수
+  var renderLimit = RENDER_STEP; // 현재 목록에 렌더된 개수
+
   var TODAY = new Date("2026-07-05");
 
   /* 두 좌표 간 거리(km) — 하버사인 (#6 거리 표시/정렬) */
@@ -169,13 +173,23 @@
     return t;                                        // 진행중: 마감 빠른 순
   }
 
-  // 필터는 서버 처리. 여기서는 (1)마감 공고 미표시(#9) 후 (2)클라이언트 정렬.
-  function getVisibleJobs() {
-    // #9 마감된 공고 자동 미표시 — 마감일이 지난 공고 제외(상시채용/진행중만)
-    var list = jobs.filter(function (j) {
+  // 마감 공고 미표시(#9) 후의 활성 공고 (지도 범위 필터 전). 지도 fit 기준으로도 쓰임.
+  function activeJobs() {
+    return jobs.filter(function (j) {
       var d = ddayOf(j);
       return d === null || d >= 0;
     });
+  }
+
+  // #9 현재 지도 화면 범위(viewBounds) 안에 있는 공고인지
+  function inView(job) {
+    if (!viewBounds || !useKakao || job.lat == null || job.lng == null) return true;
+    return viewBounds.contain(new kakao.maps.LatLng(job.lat, job.lng));
+  }
+
+  // 목록/마커용: (1)마감 미표시 (2)지도 범위 필터(#9) (3)클라이언트 정렬.
+  function getVisibleJobs() {
+    var list = activeJobs().filter(inView);
 
     list.sort(function (a, b) {
       if (state.sort === "deadline") {
@@ -266,14 +280,19 @@
     $("#filterReset").prop("hidden", !anyActive && !state.keyword);
   }
 
-  /* ---------- 렌더링: 리스트 ---------- */
-  function renderList(jobs) {
-    var $list = $("#jobList").empty();
+  /* ---------- 렌더링: 리스트 (#9 무한스크롤: renderLimit 까지만) ---------- */
+  // append=true 면 이전 렌더 뒤에 다음 묶음만 추가(스크롤 위치 유지)
+  function renderList(jobs, append) {
+    var $list = $("#jobList");
+    if (!append) {
+      $list.empty();
+      $("#resultCount").text(jobs.length);       // 조건에 해당하는(현재 뷰) 전체 수 표시
+      $("#listEmpty").prop("hidden", jobs.length > 0);
+    }
+    var start = append ? renderLimit - RENDER_STEP : 0;
+    var slice = jobs.slice(start, renderLimit);
 
-    $("#resultCount").text(jobs.length);
-    $("#listEmpty").prop("hidden", jobs.length > 0);
-
-    jobs.forEach(function (job) {
+    slice.forEach(function (job) {
       var diff = ddayOf(job);
       var $card = $(
         '<li class="job-card' + (job.id === state.selectedId ? " is-selected" : "") +
@@ -343,7 +362,13 @@
       level: 11
     });
 
-    // 현재 결과 전체가 보이도록 최초 1회 범위 맞춤
+    // #9 지도 이동/확대가 끝나면(idle) 화면 범위로 목록·마커 자동 갱신
+    kakao.maps.event.addListener(kakaoMap, "idle", function () {
+      viewBounds = kakaoMap.getBounds();
+      renderAll();
+    });
+
+    // 현재 결과 전체가 보이도록 최초 1회 범위 맞춤 (이후 idle 이 뷰 기준으로 갱신)
     fitMapToJobs();
     renderMarkers(getVisibleJobs());
   }
@@ -463,12 +488,13 @@
     renderRecent();
   }
 
-  /* 현재 결과 전체가 보이도록 지도 범위 조정 (컨테이너가 보이는 상태에서 호출해야 정확) */
+  /* 결과 전체(마감 제외, 지도범위 무관)가 보이도록 지도 범위 조정.
+     getVisibleJobs(뷰 필터 적용) 를 쓰면 순환하므로 activeJobs 기준으로 fit 한다. */
   function fitMapToJobs() {
-    var jobs = getVisibleJobs();
-    if (!kakaoMap || !jobs.length) return;
+    var list = activeJobs();
+    if (!kakaoMap || !list.length) return;
     var bounds = new kakao.maps.LatLngBounds();
-    jobs.forEach(function (job) {
+    list.forEach(function (job) {
       if (job.lat != null) bounds.extend(new kakao.maps.LatLng(job.lat, job.lng));
     });
     kakaoMap.setBounds(bounds);
@@ -577,11 +603,13 @@
     );
   }
 
+  // 새 조건/뷰로 전체 리렌더 — 목록은 맨 위부터(renderLimit 초기화), 마커는 전부(뷰 내).
   function renderAll() {
+    renderLimit = RENDER_STEP;
     var jobs = getVisibleJobs();
     renderFilterBar();
-    renderList(jobs);
-    renderMarkers(jobs);
+    renderList(jobs);        // 앞의 renderLimit 개만 표시
+    renderMarkers(jobs);     // 뷰 안 마커는 전부 표시
     renderMapSelected();
   }
 
@@ -713,6 +741,16 @@
     // 원문 링크 클릭은 카드 선택 토글을 막고 링크만 열리게 함
     $("#jobList").on("click", ".job-card__link", function (e) {
       e.stopPropagation();
+    });
+
+    // #9 목록 무한스크롤 — 바닥 근처에서 다음 묶음 추가 렌더(스크롤 위치 유지)
+    $("#jobList").on("scroll", function () {
+      var el = this;
+      if (el.scrollTop + el.clientHeight < el.scrollHeight - 240) return;
+      var list = getVisibleJobs();
+      if (renderLimit >= list.length) return;
+      renderLimit += RENDER_STEP;
+      renderList(list, true); // append 모드
     });
 
     // 카드 선택 (클릭/키보드)
