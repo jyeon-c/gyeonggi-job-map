@@ -24,8 +24,21 @@
   var opt = {
     label: thisScript.getAttribute("data-label") || "채용공고 지도",
     position: thisScript.getAttribute("data-position") === "left" ? "left" : "right",
-    color: thisScript.getAttribute("data-color") || "#1a73d1"
+    color: thisScript.getAttribute("data-color") || "#1a73d1",
+    // #1 분양처 브랜딩 — 팝업 상단에 분양처 로고/이름 표시, src 로 분양처 구분
+    brand: thisScript.getAttribute("data-brand") || "",
+    logo: thisScript.getAttribute("data-logo") || "",
+    src: thisScript.getAttribute("data-src") || ""
   };
+
+  // 팝업(iframe)으로 넘길 분양처 파라미터 URL
+  function iframeUrl() {
+    var q = [];
+    if (opt.brand) q.push("brand=" + encodeURIComponent(opt.brand));
+    if (opt.logo) q.push("logo=" + encodeURIComponent(opt.logo));
+    if (opt.src) q.push("src=" + encodeURIComponent(opt.src));
+    return base + "/index.html" + (q.length ? "?" + q.join("&") : "");
+  }
 
   // 스타일 (host 페이지와 충돌 없게 jmw- 접두사 + 높은 z-index)
   var css =
@@ -78,7 +91,7 @@
     overlay.innerHTML =
       '<div class="jmw-modal" role="dialog" aria-modal="true" aria-label="' + opt.label + '">' +
         '<button type="button" class="jmw-close" aria-label="닫기">×</button>' +
-        '<iframe src="' + base + '/index.html" title="' + opt.label + '" ' +
+        '<iframe src="' + iframeUrl() + '" title="' + opt.label + '" ' +
           'allow="geolocation" loading="lazy"></iframe>' +
       "</div>";
     document.body.appendChild(overlay);

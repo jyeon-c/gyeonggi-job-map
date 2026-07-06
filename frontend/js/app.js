@@ -832,8 +832,22 @@
     $c.prop("hidden", false);
   }
 
+  /* ---------- #1 분양처 브랜딩 (URL 파라미터) ---------- */
+  function applyBranding() {
+    var p = new URLSearchParams(location.search);
+    var brand = p.get("brand");
+    if (!brand) return;               // 분양처 파라미터 없으면 기본 헤더만
+    var logo = p.get("logo");
+    $("#brandName").text(brand);
+    if (logo) { $("#brandLogo").attr("src", logo).prop("hidden", false); }
+    $("#brandBar").prop("hidden", false);
+    $("body").addClass("has-brand");
+    // src(분양처 식별자)는 추후 분양처별 로깅/통계에 활용 가능
+  }
+
   /* ---------- 초기화 ---------- */
   $(function () {
+    applyBranding();   // 위젯 임베드 분양처 브랜딩 먼저 적용
     bindEvents();
     renderFilterBar(); // 필터 칩은 데이터와 무관하게 먼저 그려둔다
     reloadJobs();      // API 에서 초기 목록 로드

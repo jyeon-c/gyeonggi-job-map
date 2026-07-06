@@ -53,6 +53,26 @@ button { font-family: inherit; cursor: pointer; }
 }
 .job-card:focus-visible { outline-offset: -1px; }
 
+/* #1 분양처 브랜딩 바 */
+.brand-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 101;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  background: #1c2733;
+  color: #fff;
+  font-size: 12.5px;
+}
+.brand-bar[hidden] { display: none; }
+.brand-bar__logo { height: 20px; width: auto; border-radius: 3px; background: #fff; }
+.brand-bar__logo[hidden] { display: none; }
+.brand-bar__name { font-weight: 700; }
+.brand-bar__by { margin-left: auto; opacity: .7; font-size: 11.5px; }
+
 /* ===== 헤더 ===== */
 .header {
   position: fixed;
@@ -61,6 +81,10 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--bg-card);
   border-bottom: 1px solid var(--line);
 }
+
+/* 브랜딩 바가 있으면 헤더/본문을 36px 아래로 */
+body.has-brand .header { top: 36px; }
+body.has-brand .content { padding-top: calc(var(--header-h) + var(--filterbar-h) + 36px); }
 
 .header__inner {
   height: var(--header-h);
