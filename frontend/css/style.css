@@ -563,13 +563,13 @@ button { font-family: inherit; cursor: pointer; }
 }
 .policy-menu a:hover { background: var(--primary-light); color: var(--primary-dark); }
 
-/* 위치 동의 안내 */
+/* 위치 동의 안내 (#3 최초 접속 안내 겸용 — 리스트/지도 뷰 무관하게 보이도록 fixed) */
 .geo-consent {
-  position: absolute;
+  position: fixed;
   left: 50%;
-  top: 68px;
+  top: 90px;
   transform: translateX(-50%);
-  z-index: 60;
+  z-index: 130;
   width: min(360px, calc(100% - 32px));
   background: #fff;
   border: 1px solid var(--line);
@@ -638,12 +638,12 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 /* 지도 위 선택 공고 미니 카드 */
+/* #2 PC=좌측 배치 (모바일은 하단 — 아래 미디어쿼리에서 재정의) */
 .map-selected {
   position: absolute;
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%);
-  width: min(420px, calc(100% - 32px));
+  left: 16px;
+  bottom: 16px;
+  width: min(340px, calc(100% - 32px));
   background: #fff;
   border-radius: var(--radius);
   box-shadow: var(--shadow-pop);
@@ -742,6 +742,15 @@ button { font-family: inherit; cursor: pointer; }
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
     z-index: 50;
+  }
+
+  /* #2 모바일: 상세 미니카드를 하단 중앙으로 */
+  .map-selected {
+    left: 50%;
+    right: auto;
+    bottom: 16px;
+    transform: translateX(-50%);
+    width: min(420px, calc(100% - 24px));
   }
 
   /* 지도 뷰 활성화 시 */

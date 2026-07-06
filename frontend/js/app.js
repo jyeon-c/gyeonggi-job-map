@@ -793,10 +793,12 @@
     });
     $("#geoAgree").on("click", function () {
       $("#geoConsent").prop("hidden", true);
+      markGeoPrompted();
       locate();
     });
     $("#geoCancel").on("click", function () {
       $("#geoConsent").prop("hidden", true);
+      markGeoPrompted();
     });
 
     // #8 정책정보 드롭다운
@@ -807,12 +809,36 @@
     $(document).on("click", function () { $("#policyMenu").prop("hidden", true); });
   }
 
+  /* ---------- #3 접속 환경별 기본 위치 안내 ---------- */
+  var GEO_KEY = "jobmap_geo_prompted";
+  function isMobile() {
+    return window.matchMedia && window.matchMedia("(max-width: 767px)").matches;
+  }
+  function markGeoPrompted() {
+    try { localStorage.setItem(GEO_KEY, "1"); } catch (e) {}
+  }
+  function maybePromptLocation() {
+    var prompted;
+    try { prompted = localStorage.getItem(GEO_KEY); } catch (e) { prompted = null; }
+    if (prompted) return;                 // 재방문은 안내 안 함
+    // 모바일=GPS 안내, PC=IP 기반이 원칙이나 외부 IP 조회 미사용 → 경기 기본 + 위치 사용 제안
+    var $c = $("#geoConsent");
+    $c.find(".geo-consent__text").html(
+      (isMobile()
+        ? "가까운 채용공고를 보여드리기 위해 <strong>현재 위치</strong>를 사용할까요? "
+        : "내 주변 채용공고를 보려면 <strong>현재 위치</strong>를 사용할 수 있어요. ") +
+      "위치 정보는 지도 표시·주변 정렬에만 쓰이며 저장되지 않습니다."
+    );
+    $c.prop("hidden", false);
+  }
+
   /* ---------- 초기화 ---------- */
   $(function () {
     bindEvents();
     renderFilterBar(); // 필터 칩은 데이터와 무관하게 먼저 그려둔다
     reloadJobs();      // API 에서 초기 목록 로드
     loadKakaoSdk();
+    setTimeout(maybePromptLocation, 900); // #3 최초 접속 위치 안내(1회)
   });
 
 })(jQuery);
