@@ -75,6 +75,8 @@
 
   var myLocation = null;   // {lat,lng} 현재 위치(#4). null 이면 거리 기능 비활성
   var myMarker = null;     // 카카오 지도 위 '내 위치' 마커
+  var searchMarker = null; // #5 주소/장소 검색 결과 마커
+  var RECENT_KEY = "jobmap_recent_search"; // #5 최근 검색 저장(localStorage)
 
   var TODAY = new Date("2026-07-05");
 
@@ -192,7 +194,9 @@
   }
 
   // 조건 변경 시: API 재조회 → 상태 갱신 → 전체 리렌더. 경합 응답은 최신 요청만 반영.
-  function reloadJobs() {
+  // opts.skipFit: 지도 범위 자동 맞춤 생략(주소 검색으로 특정 위치로 이동한 경우).
+  function reloadJobs(opts) {
+    opts = opts || {};
     var seq = ++loadSeq;
     setListLoading();
     fetchJobs()
@@ -202,7 +206,7 @@
         jobsById = {};
         jobs.forEach(function (j) { jobsById[j.id] = j; });
         renderAll();
-        if (useKakao) fitMapToJobs();
+        if (useKakao && !opts.skipFit) fitMapToJobs();
       })
       .catch(function (err) {
         if (seq !== loadSeq) return;
@@ -308,8 +312,9 @@
       return;
     }
     var s = document.createElement("script");
+    // libraries=services: 주소·장소 검색(#5) 을 위한 Geocoder/Places (JS 키 그대로, 무료)
     s.src = "https://dapi.kakao.com/v2/maps/sdk.js?appkey=" +
-            encodeURIComponent(APP_CONFIG.kakaoJsKey) + "&autoload=false";
+            encodeURIComponent(APP_CONFIG.kakaoJsKey) + "&autoload=false&libraries=services";
     s.onload = function () {
       if (window.kakao && window.kakao.maps) {
         kakao.maps.load(initKakaoMap);
@@ -389,6 +394,73 @@
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
+  }
+
+  /* ---------- #5 주소/장소 검색 ---------- */
+  // 지명/주소로 보이는 검색어인지(직무 키워드 "개발/사무" 등과 구분).
+  // 장소 검색(Places)이 너무 관대해 아무 단어나 좌표를 주므로, 지명 접미사가 있을 때만 위치로 취급.
+  function looksLikePlace(q) {
+    return /(특별시|광역시|특별자치[시도]|[가-힣]+도|시|군|구|읍|면|동|리|로|길|가|역|청|교|공원|아파트|빌딩|타워|병원|대학교|터미널|사거리)(\s|$)/.test(q)
+      || /(역|청|점|관)$/.test(q);
+  }
+
+  // 주소 우선 → (지명형일 때만) 장소 검색. done({lat,lng}) 또는 done(null).
+  function resolvePlace(query, done) {
+    query = (query || "").trim();
+    if (!query || !useKakao || !window.kakao || !kakao.maps.services) { done(null); return; }
+
+    var geocoder = new kakao.maps.services.Geocoder();
+    geocoder.addressSearch(query, function (result, status) {
+      if (status === kakao.maps.services.Status.OK && result[0]) {
+        done({ lat: +result[0].y, lng: +result[0].x });
+        return;
+      }
+      if (!looksLikePlace(query)) { done(null); return; } // 직무 키워드 → 목록 필터로
+      var places = new kakao.maps.services.Places();
+      places.keywordSearch(query, function (data, st) {
+        done((st === kakao.maps.services.Status.OK && data[0])
+          ? { lat: +data[0].y, lng: +data[0].x } : null);
+      });
+    });
+  }
+
+  function moveToPlace(lat, lng) {
+    var pos = new kakao.maps.LatLng(lat, lng);
+    if (searchMarker) searchMarker.setMap(null);
+    searchMarker = new kakao.maps.Marker({
+      map: kakaoMap, position: pos, image: markerImage("#f59e0b", true), zIndex: 25, title: "검색 위치"
+    });
+    kakaoMap.setLevel(6);
+    kakaoMap.panTo(pos);
+  }
+
+  /* ---------- #5 최근 검색 ---------- */
+  function getRecent() {
+    try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function addRecent(q) {
+    q = (q || "").trim();
+    if (!q) return;
+    var arr = getRecent().filter(function (x) { return x !== q; });
+    arr.unshift(q);
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(arr.slice(0, 6))); } catch (e) {}
+  }
+  function renderRecent() {
+    var arr = getRecent();
+    var $box = $("#searchRecent");
+    if (!arr.length) { $box.prop("hidden", true).empty(); return; }
+    var html = '<p class="search-recent__head">최근 검색</p>';
+    arr.forEach(function (q) {
+      html += '<button type="button" class="search-recent__item" data-q="' + esc(q) + '">' +
+        '<span>' + esc(q) + '</span>' +
+        '<span class="search-recent__del" data-del="' + esc(q) + '" aria-label="삭제">×</span></button>';
+    });
+    $box.html(html).prop("hidden", false);
+  }
+  function removeRecent(q) {
+    var arr = getRecent().filter(function (x) { return x !== q; });
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(arr)); } catch (e) {}
+    renderRecent();
   }
 
   /* 현재 결과 전체가 보이도록 지도 범위 조정 (컨테이너가 보이는 상태에서 호출해야 정확) */
@@ -547,12 +619,46 @@
 
   /* ---------- 이벤트 바인딩 ---------- */
   function bindEvents() {
-    // 검색 (서버 재조회)
+    // 검색: 주소/장소면 그 위치로 이동 + 주변순 목록(#5), 아니면 키워드 목록 필터(#7)
     $("#searchForm").on("submit", function (e) {
       e.preventDefault();
-      state.keyword = $("#searchInput").val();
+      var q = $("#searchInput").val().trim();
       state.selectedId = null;
-      reloadJobs();
+      $("#searchRecent").prop("hidden", true);
+      if (q) addRecent(q);
+      if (!q) { state.keyword = ""; reloadJobs(); return; }
+
+      resolvePlace(q, function (loc) {
+        if (loc) {
+          // 위치 검색: 지도 이동 + 기준 위치 설정 → 목록을 그 주변 가까운 순으로
+          myLocation = loc;
+          moveToPlace(loc.lat, loc.lng);
+          state.keyword = "";
+          state.sort = "distance";
+          $("#sortSelect").val("distance");
+          reloadJobs({ skipFit: true });
+        } else {
+          // 장소 아님 → 직무/회사/지역 키워드 목록 필터
+          state.keyword = q;
+          reloadJobs();
+        }
+      });
+    });
+
+    // 최근 검색 표시/선택/삭제 (#5)
+    $("#searchInput").on("focus", function () { renderRecent(); });
+    $("#searchRecent").on("click", ".search-recent__del", function (e) {
+      e.stopPropagation();
+      removeRecent($(this).data("del"));
+    });
+    $("#searchRecent").on("click", ".search-recent__item", function () {
+      var q = $(this).data("q");
+      $("#searchInput").val(q);
+      $("#searchForm").trigger("submit");
+    });
+    // 검색 영역 바깥 클릭 시 최근검색 닫기
+    $(document).on("click", function (e) {
+      if (!$(e.target).closest("#searchForm").length) $("#searchRecent").prop("hidden", true);
     });
 
     // 필터 칩 열기/닫기
