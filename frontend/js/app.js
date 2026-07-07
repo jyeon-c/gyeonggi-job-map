@@ -429,6 +429,16 @@
     renderAll();
   }
 
+  // 간단 토스트 (지도 위 안내)
+  var toastTimer = null;
+  function showToast(msg) {
+    var $t = $("#toast");
+    if (!$t.length) { $t = $('<div id="toast" class="toast"></div>').appendTo("body"); }
+    $t.text(msg).addClass("is-on");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { $t.removeClass("is-on"); }, 4000);
+  }
+
   function locate() {
     if (!navigator.geolocation) {
       alert("이 브라우저는 위치 기능을 지원하지 않습니다.");
@@ -439,6 +449,11 @@
       function (p) {
         $btn.removeClass("is-busy");
         applyMyLocation(p.coords.latitude, p.coords.longitude);
+        // 데스크톱 등 GPS 없는 환경은 IP/Wi-Fi 기반이라 오차가 큼(수 km) → 안내
+        var acc = p.coords.accuracy;
+        if (acc && acc > 3000) {
+          showToast("현재 위치 정확도가 낮습니다(±" + Math.round(acc / 1000) + "km). 정확한 위치는 검색창에 동/역 이름을 입력해 주세요.");
+        }
       },
       function (err) {
         $btn.removeClass("is-busy");
@@ -448,7 +463,8 @@
           : "현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.";
         alert(msg);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      // maximumAge:0 → 캐시된(오래된) 위치 재사용 금지, 매번 새로 측정. 고정확도·타임아웃 15초.
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   }
 

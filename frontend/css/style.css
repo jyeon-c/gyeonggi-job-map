@@ -614,6 +614,27 @@ body.has-brand .content { padding-top: calc(var(--header-h) + var(--filterbar-h)
 /* 내 위치 마커(폴백/카카오 공통 표시용 클래스) */
 .job-card__dist { color: var(--primary-dark); font-weight: 700; }
 
+/* 토스트 안내 (위치 정확도 등) */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translate(-50%, 12px);
+  z-index: 2000;
+  max-width: min(420px, calc(100% - 32px));
+  padding: 12px 18px;
+  background: rgba(28, 39, 51, 0.95);
+  color: #fff;
+  font-size: 13px;
+  line-height: 1.5;
+  border-radius: 10px;
+  box-shadow: var(--shadow-pop);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+
 /* 임시 마커 (카카오맵 연동 전 목데이터 미리보기) */
 .map-markers { position: absolute; inset: 0; }
 
