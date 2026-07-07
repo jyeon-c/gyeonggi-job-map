@@ -80,6 +80,32 @@ function Map-EmpType-JobKorea([string]$v) {
     return "계약직"  # 계약직/프리랜서/파견/인턴 등
 }
 
+# 직종명/직무 텍스트 → 대분류 9종 (#7 직종 필터용). 첫 매칭 우선.
+function Map-JobCategory([string]$v) {
+    if (-not $v) { return "기타" }
+    if ($v -match "개발|프로그램|프로그래밍|소프트웨어|SW|웹|서버|데이터|IT|시스템|네트워크|프론트|백엔드|QA|게임|애니메이션|솔루션|SI|CRM|ERP|컴퓨터|하드웨어") { return "IT·개발" }
+    if ($v -match "간호|의료|요양|복지|사회복지|간병|재활|치료|약사|병원|돌봄|보건") { return "의료·복지" }
+    if ($v -match "교사|강사|교육|학원|유치원|보육") { return "교육" }
+    if ($v -match "건설|토목|건축|시공|인테리어|자재|배관|시설관리|빌딩") { return "건설·설비" }
+    if ($v -match "운전|배송|택배|물류|상하차|기사|운송|화물|지게차") { return "운전·물류" }
+    if ($v -match "영업|판매|세일즈|매장|마케팅|MD|광고|홍보|전시|쇼핑몰|유통|도소매|백화점|무역|오픈마켓|소셜커머스") { return "영업·판매" }
+    if ($v -match "생산|제조|조립|가공|품질|설비|기계|전자|제어|전기|화학|공정|포장|용접|정비|금형|사출|반도체|디스플레이|광학|조작") { return "생산·제조" }
+    if ($v -match "서비스|고객|상담|안내|미용|조리|요리|음식|주방|카페|경비|청소|매니저|호텔|관광") { return "서비스" }
+    if ($v -match "사무|경리|총무|인사|회계|재무|기획|관리|행정|비서|경영|협회|단체") { return "사무·관리" }
+    return "기타"
+}
+
+# 급여 텍스트 → 최소 연봉(만원) 환산. 시급/일급/내규는 null (#7 희망임금 필터용).
+function Parse-SalaryMin([string]$s) {
+    if (-not $s -or $s -match "내규|건별") { return $null }
+    if ($s -match "(\d[\d,]*)\s*만원") {
+        $v = [int]($Matches[1] -replace ",", "")
+        if ($s -match "월급") { return $v * 12 }   # 월급 → 연 환산
+        return $v                                   # 연봉 등은 만원 그대로
+    }
+    return $null  # 시급/일급/미상
+}
+
 # '2026.6.10' / '2026.6.24 4:21' → '2026-06-10'
 function Parse-DotDate([string]$v) {
     if ($v -match "(\d{4})\.(\d{1,2})\.(\d{1,2})") {
@@ -203,7 +229,9 @@ foreach ($r in $gy24) {
         career = Map-Career $r.CAREER; careerRaw = $r.CAREER
         education = Map-Education $r.MIN_EDUBG; educationRaw = $r.MIN_EDUBG
         empType = Map-EmpType-Gy24 $r.EMP_TP_NM
+        jobCategory = Map-JobCategory $r.JOBS_NM
         salary = $salary
+        salaryMin = Parse-SalaryMin $salary
         postedAt = Parse-DotDate $r.WANTED_REG_DT
         deadline = Parse-CloseDate $r.CLOSE_DT
         url = $r.WANTED_INFO_URL
@@ -252,7 +280,9 @@ foreach ($r in $jk) {
         career = Map-Career $r.CAREER_INFO; careerRaw = $r.CAREER_INFO
         education = Map-Education $r.EDU_CUTLINE_INFO; educationRaw = $r.EDU_CUTLINE_INFO
         empType = Map-EmpType-JobKorea $r.JOB_TYPE_INFO
+        jobCategory = Map-JobCategory $r.PART_NO_INFO
         salary = $salary
+        salaryMin = Parse-SalaryMin $salary
         postedAt = Parse-YmdDate $r.GI_W_DATE
         deadline = Parse-YmdDate $r.GI_END_DATE
         url = $r.JK_URL

@@ -3,6 +3,15 @@
 이 문서는 Claude Code가 이 저장소에서 작업할 때 항상 참고하는 규칙이다.
 IntelliJ에서 Claude Code를 실행하든, 터미널에서 실행하든 동일하게 적용된다.
 
+## 한눈에 보기 (요약)
+
+- **무엇**: 지도 기반 채용공고 탐색 서비스(경기도). 다른 페이지에 **팝업 위젯**으로 이식. 운영: https://jobmapkorea.com
+- **스택**: Spring Boot(Gradle, Java 21) + PostgreSQL/PostGIS · 순수 HTML/JS/jQuery + 카카오맵 SDK · nginx + Docker Compose(AWS EC2)
+- **구조**: `backend/`(API) · `frontend/`(정적, `embed.js`=위젯) · `data/`(원본 CSV→`scripts/`로 `jobs.json` 생성) · `docs/`(Obsidian 볼트)
+- **코딩 규칙**: 커밋 메시지 `[타입] 요약`(feat/fix/refactor/docs/chore) · 커밋은 작은 단위 · **로컬 동작 확인 후** 커밋 · Java는 기존 SI 컨벤션 유지
+- **브랜치**: `dev`에서 작업/커밋 → 검증 후 `main`(항상 배포 가능 상태)에 반영
+- **하지 말 것**: 원본 CSV(개인정보 포함)·`.env`·API키/DB비번 **커밋 금지**(gitignore) · `main` 직접 push·force push는 **사용자 확인 후**에만
+
 ## 프로젝트 개요
 
 - 지도 기반 채용공고 탐색 웹 서비스(팝업 위젯 형태)

@@ -19,7 +19,9 @@ public record JobResponse(
     String career,
     String education,
     String empType,
+    String jobCategory,
     String salary,
+    Integer salaryMin,
     LocalDate postedAt,
     LocalDate deadline,
     String url,
@@ -31,7 +33,7 @@ public record JobResponse(
     return new JobResponse(
         j.getId(), j.getSource(), j.getSourceName(), j.getTitle(), j.getCompany(),
         j.getRegion(), j.getAddressRaw(), j.getCareer(), j.getEducation(), j.getEmpType(),
-        j.getSalary(), j.getPostedAt(), j.getDeadline(), j.getUrl(),
+        j.getJobCategory(), j.getSalary(), j.getSalaryMin(), j.getPostedAt(), j.getDeadline(), j.getUrl(),
         j.getLat(), j.getLng(), j.getGeocodePrecision());
   }
 }

@@ -27,6 +27,7 @@ public class JobPostingService {
   public PageResponse<JobResponse> search(
       Double swLat, Double swLng, Double neLat, Double neLng,
       String source, String career, String edu, String empType,
+      String jobCategory, Integer minSalary,
       String keyword, int page, int size) {
 
     // bbox 는 4개 값이 전부 있어야 유효 — 일부만 오면 잘못된 요청으로 처리
@@ -41,7 +42,7 @@ public class JobPostingService {
     var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "postedAt"));
     var result = repository.search(swLat, swLng, neLat, neLng,
         blankToNull(source), blankToNull(career), blankToNull(edu), blankToNull(empType),
-        kw, pageable);
+        blankToNull(jobCategory), minSalary, kw, pageable);
     return PageResponse.from(result.map(JobResponse::from));
   }
 

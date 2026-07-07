@@ -31,11 +31,14 @@ public class JobPostingController {
       @RequestParam(required = false) String career,
       @RequestParam(required = false) String edu,
       @RequestParam(required = false) String employmentType,
+      @RequestParam(required = false) String jobCategory,
+      @RequestParam(required = false) Integer minSalary,
       @RequestParam(required = false) String keyword,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
     return service.search(swLat, swLng, neLat, neLng,
-        source, career, edu, employmentType, keyword, page, Math.min(size, 100));
+        source, career, edu, employmentType, jobCategory, minSalary,
+        keyword, page, Math.min(size, 100));
   }
 
   /** 현재 위치 기준 반경 검색 (거리순) */

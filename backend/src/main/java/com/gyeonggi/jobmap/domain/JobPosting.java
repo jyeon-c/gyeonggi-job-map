@@ -78,8 +78,15 @@ public class JobPosting {
   @Column(length = 10)
   private String empType;
 
+  /** 직종 대분류 (IT·개발/생산·제조/… 9종 + 기타) — #7 직종 필터 */
+  @Column(length = 20)
+  private String jobCategory;
+
   @Column(length = 100)
   private String salary;
+
+  /** 최소 연봉(만원) 환산, null=시급/일급/내규 등 미상 — #7 희망임금 필터 */
+  private Integer salaryMin;
 
   private LocalDate postedAt;
 

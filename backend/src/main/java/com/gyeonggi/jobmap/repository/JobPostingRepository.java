@@ -22,6 +22,8 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
         and (:career is null or j.career = :career)
         and (:edu is null or j.education = :edu)
         and (:empType is null or j.empType = :empType)
+        and (:jobCategory is null or j.jobCategory = :jobCategory)
+        and (:minSalary is null or (j.salaryMin is not null and j.salaryMin >= :minSalary))
         and (:kw is null
              or lower(j.title) like concat('%', :kw, '%')
              or lower(j.company) like concat('%', :kw, '%')
@@ -32,6 +34,7 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
       @Param("neLat") Double neLat, @Param("neLng") Double neLng,
       @Param("source") String source, @Param("career") String career,
       @Param("edu") String edu, @Param("empType") String empType,
+      @Param("jobCategory") String jobCategory, @Param("minSalary") Integer minSalary,
       @Param("kw") String keyword, Pageable pageable);
 
   /** 반경 검색 1차 후보: 반경을 감싸는 사각형으로 추린다 (거리 계산은 서비스에서) */

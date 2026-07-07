@@ -63,7 +63,8 @@ public class JobDataLoader implements CommandLineRunner {
       Long id, String source, String sourceName, String title, String company,
       String bizNo, String region, String addressRaw,
       String career, String careerRaw, String education, String educationRaw,
-      String empType, String salary, String postedAt, String deadline, String url,
+      String empType, String jobCategory, String salary, Integer salaryMin,
+      String postedAt, String deadline, String url,
       Double lat, Double lng, String geocodePrecision) {
 
     JobPosting toEntity() {
@@ -72,7 +73,7 @@ public class JobDataLoader implements CommandLineRunner {
           .bizNo(bizNo).region(region).addressRaw(addressRaw)
           .career(career).careerRaw(careerRaw)
           .education(education).educationRaw(educationRaw)
-          .empType(empType).salary(salary)
+          .empType(empType).jobCategory(jobCategory).salary(salary).salaryMin(salaryMin)
           .postedAt(parse(postedAt)).deadline(parse(deadline))
           .url(url).lat(lat).lng(lng).geocodePrecision(geocodePrecision)
           .build();

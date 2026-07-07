@@ -42,6 +42,32 @@
         { value: "계약직", text: "계약직" },
         { value: "파트타임", text: "파트타임" }
       ]
+    },
+    {
+      key: "jobCategory", label: "직종",
+      options: [
+        { value: "", text: "전체" },
+        { value: "IT·개발", text: "IT·개발" },
+        { value: "사무·관리", text: "사무·관리" },
+        { value: "생산·제조", text: "생산·제조" },
+        { value: "영업·판매", text: "영업·판매" },
+        { value: "서비스", text: "서비스" },
+        { value: "의료·복지", text: "의료·복지" },
+        { value: "교육", text: "교육" },
+        { value: "건설·설비", text: "건설·설비" },
+        { value: "운전·물류", text: "운전·물류" },
+        { value: "기타", text: "기타" }
+      ]
+    },
+    {
+      key: "minSalary", label: "희망임금",
+      options: [
+        { value: "", text: "전체" },
+        { value: "2000", text: "연 2천만원 이상" },
+        { value: "3000", text: "연 3천만원 이상" },
+        { value: "4000", text: "연 4천만원 이상" },
+        { value: "5000", text: "연 5천만원 이상" }
+      ]
     }
   ];
 
@@ -63,7 +89,7 @@
   /* ---------- 상태 ---------- */
   var state = {
     keyword: "",
-    filters: { source: "", career: "", education: "", empType: "" },
+    filters: { source: "", career: "", education: "", empType: "", jobCategory: "", minSalary: "" },
     sort: "latest",
     selectedId: null
   };
@@ -144,6 +170,8 @@
     if (state.filters.career) params.set("career", state.filters.career);
     if (state.filters.education) params.set("edu", state.filters.education);
     if (state.filters.empType) params.set("employmentType", state.filters.empType);
+    if (state.filters.jobCategory) params.set("jobCategory", state.filters.jobCategory);
+    if (state.filters.minSalary) params.set("minSalary", state.filters.minSalary);
     var kw = state.keyword.trim();
     if (kw) params.set("keyword", kw);
     params.set("size", "100");
@@ -184,6 +212,9 @@
   // #9 현재 지도 화면 범위(viewBounds) 안에 있는 공고인지
   function inView(job) {
     if (!viewBounds || !useKakao || job.lat == null || job.lng == null) return true;
+    // 지도 레이아웃 전 첫 idle 은 0크기(무효) 범위를 줄 수 있음 → 필터하지 않고 전체 표시
+    var sw = viewBounds.getSouthWest(), ne = viewBounds.getNorthEast();
+    if (sw.getLat() === ne.getLat() || sw.getLng() === ne.getLng()) return true;
     return viewBounds.contain(new kakao.maps.LatLng(job.lat, job.lng));
   }
 
@@ -253,7 +284,7 @@
       var current = state.filters[def.key];
       var selectedOpt = def.options.filter(function (o) { return o.value === current; })[0];
       var isActive = current !== "";
-      var btnText = isActive ? selectedOpt.text : def.label;
+      var btnText = (isActive && selectedOpt) ? selectedOpt.text : def.label;
 
       var $chip = $(
         '<div class="filter-chip' + (isActive ? " is-active" : "") + '" data-key="' + def.key + '">' +
@@ -304,9 +335,9 @@
           '<h3 class="job-card__title">' + esc(job.title) + '</h3>' +
           '<p class="job-card__company">' + esc(job.company) + '</p>' +
           '<div class="job-card__meta">' +
+            (job.jobCategory ? '<span>' + esc(job.jobCategory) + '</span>' : '') +
             '<span>' + esc(regionShort(job.region)) + '</span>' +
             '<span>' + esc(job.career) + '</span>' +
-            '<span>' + esc(job.education) + '</span>' +
             '<span>' + esc(job.empType) + '</span>' +
             (distanceKm(job) != null
               ? '<span class="job-card__dist">' + distLabel(distanceKm(job)) + '</span>'
@@ -709,7 +740,8 @@
     // 필터 옵션 선택 (서버 재조회)
     $("#filterBar").on("click", ".filter-chip__option", function () {
       var key = $(this).closest(".filter-chip").data("key");
-      state.filters[key] = $(this).data("value");
+      // .attr 로 읽어 문자열 유지 (.data 는 "3000" 을 숫자로 바꿔 비교가 깨짐)
+      state.filters[key] = $(this).attr("data-value");
       state.selectedId = null;
       reloadJobs();
     });
