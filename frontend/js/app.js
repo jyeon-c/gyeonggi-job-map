@@ -108,7 +108,10 @@
   var RENDER_STEP = 30;    // #9 무한스크롤 1회 렌더 개수
   var renderLimit = RENDER_STEP; // 현재 목록에 렌더된 개수
 
-  var TODAY = new Date("2026-07-05");
+  // 실행 시점의 로컬 날짜를 사용한다. 날짜를 고정하면 배포 후에도 지난 공고가
+  // 진행 중으로 남아 "마감 공고 미표시" 필터가 시간이 지날수록 틀어진다.
+  var now = new Date();
+  var TODAY = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   /* 두 좌표 간 거리(km) — 하버사인 (#6 거리 표시/정렬) */
   function haversineKm(lat1, lng1, lat2, lng2) {

@@ -45,10 +45,13 @@ class JobPostingApiTest {
   private static JobPosting job(Long id, String source, String sourceName, String title,
       String company, String region, String career, String education, String empType,
       double lat, double lng, LocalDate deadline) {
+    String jobCategory = id == 1L ? "사무·관리" : id == 2L ? "IT·개발" : "생산·제조";
+    int salaryMin = id == 1L ? 2800 : id == 2L ? 4000 : 3000;
     return JobPosting.builder()
         .id(id).source(source).sourceName(sourceName).title(title).company(company)
         .region(region).career(career).education(education).empType(empType)
-        .salary("회사 내규에 따름").postedAt(LocalDate.of(2026, 7, 1)).deadline(deadline)
+        .jobCategory(jobCategory).salary("연봉 " + salaryMin + "만원").salaryMin(salaryMin)
+        .postedAt(LocalDate.of(2026, 7, 1)).deadline(deadline)
         .lat(lat).lng(lng).geocodePrecision("region_approx")
         .build();
   }
@@ -97,6 +100,22 @@ class JobPostingApiTest {
             .param("keyword", "백엔드"))
         .andExpect(jsonPath("$.totalElements").value(1))
         .andExpect(jsonPath("$.content[0].company").value("판교소프트"));
+  }
+
+  @Test
+  void 학력_고용형태_직종_희망임금_필터() throws Exception {
+    mockMvc.perform(get("/api/jobs")
+            .param("edu", "대졸 이상")
+            .param("employmentType", "정규직")
+            .param("jobCategory", "IT·개발")
+            .param("minSalary", "4000"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1))
+        .andExpect(jsonPath("$.content[0].title").value("성남 백엔드 개발자"));
+
+    mockMvc.perform(get("/api/jobs").param("minSalary", "4001"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(0));
   }
 
   @Test
