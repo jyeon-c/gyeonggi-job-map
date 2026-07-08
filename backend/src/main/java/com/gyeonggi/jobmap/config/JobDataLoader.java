@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Slf4j
 @Component
-@Profile("!test")
+@Profile({"local", "prod"})
 @RequiredArgsConstructor
 public class JobDataLoader implements CommandLineRunner {
 

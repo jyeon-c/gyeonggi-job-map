@@ -198,12 +198,40 @@ Write-Host "CSV 로드 중..."
 $gy24 = Import-Csv (Join-Path $dataDir "채용공고_고용24.csv") -Encoding UTF8
 $jk   = Import-Csv (Join-Path $dataDir "채용공고_잡코리아.csv") -Encoding UTF8
 $addrCsv = Import-Csv (Join-Path $dataDir "기업주소_사업자번호.csv") -Encoding UTF8
+$coordCsv = Import-Csv (Join-Path $dataDir "기업좌표_샘플.csv") -Encoding UTF8
+
+# 같은 회사·제목·근무지역으로 연속 재등록된 공고는 최신 원본만 남긴다.
+# 지역이 다른 동일 제목 공고(예: 같은 회사의 수원 3개 구 채용)는 별도 공고로 유지한다.
+$jkRawCount = $jk.Count
+$dedupWinners = @{}
+foreach ($r in $jk) {
+    $dedupKey = (("{0}|{1}|{2}" -f $r.COM_NAME, $r.GI_SUBJECT, $r.AREA_INFO) -replace "\s+", " ").Trim().ToLowerInvariant()
+    $current = $dedupWinners[$dedupKey]
+    if (-not $current -or $r.GI_W_DATE -gt $current.GI_W_DATE -or
+        ($r.GI_W_DATE -eq $current.GI_W_DATE -and [long]$r.GI_NO -gt [long]$current.GI_NO)) {
+        $dedupWinners[$dedupKey] = $r
+    }
+}
+$jk = @($jk | Where-Object {
+    $key = (("{0}|{1}|{2}" -f $_.COM_NAME, $_.GI_SUBJECT, $_.AREA_INFO) -replace "\s+", " ").Trim().ToLowerInvariant()
+    $dedupWinners[$key].GI_NO -eq $_.GI_NO
+})
+$duplicateCount = $jkRawCount - $jk.Count
 
 # 사업자번호 → 주소 조인 맵
 $addrMap = @{}
 foreach ($a in $addrCsv) {
     $k = Normalize-BizNo $a.BIZRNO
     if ($k -and -not $addrMap.ContainsKey($k) -and $a.HDQTR_KOR_ADRS) { $addrMap[$k] = $a }
+}
+
+# 제공된 기업 좌표가 채용공고 사업자번호와 일치하면 지역 중심점보다 우선한다.
+$companyCoordMap = @{}
+foreach ($c in $coordCsv) {
+    $k = Normalize-BizNo $c.BUSINO
+    if ($k -and -not $companyCoordMap.ContainsKey($k) -and $c.MAP_COOR_Y -and $c.MAP_COOR_X) {
+        $companyCoordMap[$k] = @{ lat = [double]$c.MAP_COOR_Y; lng = [double]$c.MAP_COOR_X }
+    }
 }
 
 # ---------- 통합 레코드 생성 ----------
@@ -279,6 +307,9 @@ foreach ($r in $jk) {
     if ($override) {
         $coord = @{ lat = [double]$override.lat; lng = [double]$override.lng }
         $precision = "exact"
+    } elseif ($bizNo -and $companyCoordMap.ContainsKey($bizNo)) {
+        $coord = $companyCoordMap[$bizNo]
+        $precision = "exact"
     } elseif ($addr) {
         $coord = Get-KakaoCoord $addr
         if ($coord) { $precision = "exact" }
@@ -331,8 +362,9 @@ $noCoord = @($jobs | Where-Object { $null -eq $_.lat }).Count
 Write-Host ""
 Write-Host "=== 빌드 완료 ==="
 Write-Host "총 $($jobs.Count)건 (고용24/경기 $gy24Count + 잡코리아 $($jk.Count))"
+Write-Host "잡코리아 중복 제거: ${duplicateCount}건 (원본 $jkRawCount → $($jk.Count))"
 Write-Host "잡코리아 정확 주소 확보: $jkExactAddr/$($jk.Count)"
 Write-Host "좌표: exact $exact / region_approx $approx / 없음 $noCoord"
-if (-not $kakaoKey) { Write-Host "※ KAKAO_REST_API_KEY 미설정 → 전부 시군 중심점 근사. 키 설정 후 재실행하면 정확 좌표로 갱신됨" }
+if (-not $kakaoKey) { Write-Host "※ KAKAO_REST_API_KEY 미설정 → 제공·수동 좌표 외에는 시군 중심점 근사. 키 설정 후 재실행하면 상세주소 좌표가 정밀화됨" }
 else { Write-Host "카카오 API 호출: $script:apiCalls 건 (캐시 재사용 포함 총 $($geoCache.Count)건 캐시)" }
 Write-Host "산출물: data\processed\jobs.json (백엔드 시딩용)"
