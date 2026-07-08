@@ -252,6 +252,19 @@
     });
   }
 
+  /* 잡코리아 추적 파라미터를 제거해 브라우저가 다른 공고 페이지를 재사용하지 않게 한다. */
+  function sourceUrl(job) {
+    if (!job.url) return "";
+    try {
+      var parsed = new URL(job.url, location.href);
+      var match = parsed.pathname.match(/^\/Recruit\/GI_Read\/(\d+)\/?$/i);
+      if (/(^|\.)jobkorea\.co\.kr$/i.test(parsed.hostname) && match) {
+        return "https://www.jobkorea.co.kr/Recruit/GI_Read/" + match[1];
+      }
+    } catch (e) {}
+    return job.url;
+  }
+
   /* ---------- API 조회 ---------- */
   // 필터/키워드는 서버에서 처리한다. 목록 UI 는 페이징 없이 전체를 보여주므로
   // size=100 으로 페이지를 끝까지 순회해 조건에 맞는 공고를 모두 모은다.
@@ -418,6 +431,7 @@
 
     slice.forEach(function (job) {
       var diff = ddayOf(job);
+      var linkUrl = sourceUrl(job);
       var $card = $(
         '<li class="job-card' + (job.id === state.selectedId ? " is-selected" : "") +
             '" data-id="' + job.id + '" tabindex="0">' +
@@ -438,8 +452,9 @@
           '</div>' +
           '<div class="job-card__foot">' +
             '<p class="job-card__salary">' + esc(job.salary) + '</p>' +
-            (job.url
-              ? '<a class="job-card__link" href="' + esc(job.url) + '" target="_blank" rel="noopener">원문 보기 ↗</a>'
+            (linkUrl
+              ? '<a class="job-card__link" href="' + esc(linkUrl) + '" data-job-id="' + job.id +
+                '" target="_blank" rel="noopener noreferrer">원문 보기 ↗</a>'
               : '') +
           '</div>' +
         '</li>'
@@ -869,8 +884,10 @@
     if (!job) { $box.prop("hidden", true).empty(); return; }
 
     var approx = job.geocodePrecision === "region_approx" ? ' · <em>위치 근사</em>' : '';
-    var link = job.url
-      ? '<a class="map-selected__link" href="' + esc(job.url) + '" target="_blank" rel="noopener">원문 보기 ↗</a>'
+    var linkUrl = sourceUrl(job);
+    var link = linkUrl
+      ? '<a class="map-selected__link" href="' + esc(linkUrl) + '" data-job-id="' + job.id +
+        '" target="_blank" rel="noopener noreferrer">원문 보기 ↗</a>'
       : '';
     $box.prop("hidden", false).html(
       '<button type="button" class="map-selected__close" aria-label="닫기">×</button>' +
