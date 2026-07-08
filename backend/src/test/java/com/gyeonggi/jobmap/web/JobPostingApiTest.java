@@ -65,6 +65,19 @@ class JobPostingApiTest {
   }
 
   @Test
+  void 같은_등록일도_ID_기준으로_안정적으로_페이징한다() throws Exception {
+    mockMvc.perform(get("/api/jobs").param("page", "0").param("size", "2"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].id").value(3))
+        .andExpect(jsonPath("$.content[1].id").value(2));
+
+    mockMvc.perform(get("/api/jobs").param("page", "1").param("size", "2"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].id").value(1));
+  }
+
+  @Test
   void 출처_필터() throws Exception {
     mockMvc.perform(get("/api/jobs").param("source", "public"))
         .andExpect(status().isOk())

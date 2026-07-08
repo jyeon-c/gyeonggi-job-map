@@ -39,7 +39,10 @@ public class JobPostingService {
     }
 
     String kw = (keyword == null || keyword.isBlank()) ? null : keyword.trim().toLowerCase();
-    var pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "postedAt"));
+    // 등록일이 같은 공고가 많으므로 ID까지 정렬해야 페이지 경계에서 중복·누락되지 않는다.
+    var pageable = PageRequest.of(page, size,
+        Sort.by(Sort.Direction.DESC, "postedAt")
+            .and(Sort.by(Sort.Direction.DESC, "id")));
     var result = repository.search(swLat, swLng, neLat, neLng,
         blankToNull(source), blankToNull(career), blankToNull(edu), blankToNull(empType),
         blankToNull(jobCategory), minSalary, kw, pageable);

@@ -290,7 +290,13 @@
         .then(function (data) {
           acc = acc.concat(data.content);
           if (page + 1 < data.totalPages) return fetchPage(page + 1, acc);
-          return acc;
+          // 구버전 API나 네트워크 재시도에서도 동일 ID가 목록·마커에 반복되지 않게 방어한다.
+          var seen = {};
+          return acc.filter(function (job) {
+            if (seen[job.id]) return false;
+            seen[job.id] = true;
+            return true;
+          });
         });
     }
     return fetchPage(0, []);
