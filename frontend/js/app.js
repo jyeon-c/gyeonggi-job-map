@@ -81,7 +81,7 @@
   var hoverCircle = null;    // 리스트 hover 시 공고 위치를 강조하는 반투명 원
   var useKakao = false;      // false 면 플레이스홀더 폴백으로 동작
   var MARKER_COLORS = { public: "#0f766e", private: "#1a73d1", selected: "#dc2626" };
-  var INDIVIDUAL_MARKER_LEVEL = 5; // 이 레벨 이하(확대)에서는 지역 배지 대신 개별 공고 핀
+  var INDIVIDUAL_MARKER_LEVEL = 3; // 건물 단위로 아주 가깝게 확대한 경우에만 개별 공고 핀
   var lastMapLevel = null;          // 줌 변경 감지 → 지도 핀 단일 목록 상태 해제
 
   /* ---------- API ---------- */
