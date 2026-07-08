@@ -563,6 +563,35 @@ body.has-brand .content { padding-top: calc(var(--header-h) + var(--filterbar-h)
 .map-ctrl.is-busy { opacity: .6; pointer-events: none; }
 .map-ctrl-wrap { position: relative; }
 
+.map-zoom-controls {
+  position: absolute;
+  top: 64px;
+  right: 14px;
+  z-index: 39;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.map-zoom-controls[hidden] { display: none; }
+
+.map-zoom-controls button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: #fff;
+  color: var(--text-strong);
+  font-size: 25px;
+  line-height: 1;
+}
+
+.map-zoom-controls button + button { border-top: 1px solid var(--line); }
+.map-zoom-controls button:hover { background: var(--primary-light); color: var(--primary-dark); }
+
 .policy-menu {
   position: absolute;
   top: calc(100% + 6px);

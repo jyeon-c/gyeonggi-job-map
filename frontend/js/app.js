@@ -81,6 +81,8 @@
   var hoverCircle = null;    // 리스트 hover 시 공고 위치를 강조하는 반투명 원
   var useKakao = false;      // false 면 플레이스홀더 폴백으로 동작
   var MARKER_COLORS = { public: "#0f766e", private: "#1a73d1", selected: "#dc2626" };
+  var INDIVIDUAL_MARKER_LEVEL = 5; // 이 레벨 이하(확대)에서는 지역 배지 대신 개별 공고 핀
+  var lastMapLevel = null;          // 줌 변경 감지 → 지도 핀 단일 목록 상태 해제
 
   /* ---------- API ---------- */
   // 운영은 nginx 가 같은 오리진에서 /api 를 프록시하므로 apiBase="" 가 기본.
@@ -92,7 +94,8 @@
     keyword: "",
     filters: { source: "", career: "", education: "", empType: "", jobCategory: "", minSalary: "" },
     sort: "latest",
-    selectedId: null
+    selectedId: null,
+    mapFocusedId: null
   };
 
   // 현재 조건으로 API 에서 받아온 공고 목록(정렬 전 원본)과 id 색인
@@ -251,6 +254,7 @@
   // opts.skipFit: 지도 범위 자동 맞춤 생략(주소 검색으로 특정 위치로 이동한 경우).
   function reloadJobs(opts) {
     opts = opts || {};
+    state.mapFocusedId = null;
     var seq = ++loadSeq;
     setListLoading();
     fetchJobs()
@@ -401,9 +405,16 @@
       center: new kakao.maps.LatLng(37.41, 127.15), // 경기도 중심부
       level: 11
     });
+    lastMapLevel = kakaoMap.getLevel();
+    $("#mapZoomControls").prop("hidden", false);
 
     // #9 지도 이동/확대가 끝나면(idle) 화면 범위로 목록·마커 자동 갱신
     kakao.maps.event.addListener(kakaoMap, "idle", function () {
+      var level = kakaoMap.getLevel();
+      if (lastMapLevel !== null && level !== lastMapLevel) {
+        state.mapFocusedId = null;
+      }
+      lastMapLevel = level;
       viewBounds = kakaoMap.getBounds();
       renderAll();
     });
@@ -600,9 +611,33 @@
     }).filter(function (group) { return group.coordCount > 0; });
   }
 
+  function imageForJob(job) {
+    if (job.id === state.selectedId) return markerImage(MARKER_COLORS.selected, true);
+    return markerImage(MARKER_COLORS[job.source], false);
+  }
+
   function renderKakaoMarkers(jobs) {
     kakaoMarkers.forEach(function (m) { m.setMap(null); });
     kakaoMarkers = [];
+
+    if (kakaoMap.getLevel() <= INDIVIDUAL_MARKER_LEVEL) {
+      jobs.forEach(function (job) {
+        if (job.lat == null || job.lng == null) return;
+        var marker = new kakao.maps.Marker({
+          map: kakaoMap,
+          position: new kakao.maps.LatLng(job.lat, job.lng),
+          image: imageForJob(job),
+          title: job.title,
+          zIndex: job.id === state.selectedId ? 10 : 2
+        });
+        marker.__job = job;
+        kakao.maps.event.addListener(marker, "click", function () {
+          focusJobFromMap(job);
+        });
+        kakaoMarkers.push(marker);
+      });
+      return;
+    }
 
     groupJobsByRegion(jobs).forEach(function (group) {
       var selected = group.jobs.some(function (job) { return job.id === state.selectedId; });
@@ -624,7 +659,7 @@
       overlay.__group = group;
       content.addEventListener("click", function () {
         if (group.jobs.length === 1) {
-          selectJob(group.jobs[0].id, { scrollList: true });
+          focusJobFromMap(group.jobs[0]);
           return;
         }
         kakaoMap.setLevel(Math.max(3, kakaoMap.getLevel() - 2));
@@ -636,6 +671,11 @@
 
   function updateKakaoMarkerStyles() {
     kakaoMarkers.forEach(function (overlay) {
+      if (overlay.__job) {
+        overlay.setImage(imageForJob(overlay.__job));
+        overlay.setZIndex(overlay.__job.id === state.selectedId ? 10 : 2);
+        return;
+      }
       var selected = overlay.__group.jobs.some(function (job) { return job.id === state.selectedId; });
       $(overlay.getContent()).toggleClass("is-selected", selected);
       overlay.setZIndex(selected ? 10 : 2);
@@ -728,14 +768,29 @@
     );
   }
 
+  function jobsForList(visibleJobs) {
+    if (state.mapFocusedId == null) return visibleJobs;
+    var focused = visibleJobs.filter(function (job) { return job.id === state.mapFocusedId; });
+    if (focused.length) return focused;
+    state.mapFocusedId = null;
+    return visibleJobs;
+  }
+
   // 새 조건/뷰로 전체 리렌더 — 목록은 맨 위부터(renderLimit 초기화), 마커는 전부(뷰 내).
   function renderAll() {
     renderLimit = RENDER_STEP;
-    var jobs = getVisibleJobs();
+    var visibleJobs = getVisibleJobs();
     renderFilterBar();
-    renderList(jobs);        // 앞의 renderLimit 개만 표시
-    renderMarkers(jobs);     // 뷰 안 마커는 전부 표시
+    renderList(jobsForList(visibleJobs)); // 지도 핀 클릭 시에는 해당 공고 1건만 표시
+    renderMarkers(visibleJobs);           // 지도 핀은 현재 뷰의 공고를 모두 유지
     renderMapSelected();
+  }
+
+  function focusJobFromMap(job) {
+    clearHoverArea();
+    state.mapFocusedId = job.id;
+    state.selectedId = job.id;
+    renderAll();
   }
 
   /* ---------- 선택 동기화 ---------- */
@@ -877,10 +932,18 @@
     $("#jobList").on("scroll", function () {
       var el = this;
       if (el.scrollTop + el.clientHeight < el.scrollHeight - 240) return;
-      var list = getVisibleJobs();
+      var list = jobsForList(getVisibleJobs());
       if (renderLimit >= list.length) return;
       renderLimit += RENDER_STEP;
       renderList(list, true); // append 모드
+    });
+
+    // 지도 확대·축소 버튼. 줌 변경 후 idle 이벤트에서 단일 공고 목록을 현재 지역 목록으로 복원한다.
+    $("#btnZoomIn").on("click", function () {
+      if (useKakao) kakaoMap.setLevel(Math.max(1, kakaoMap.getLevel() - 1), { animate: true });
+    });
+    $("#btnZoomOut").on("click", function () {
+      if (useKakao) kakaoMap.setLevel(Math.min(14, kakaoMap.getLevel() + 1), { animate: true });
     });
 
     // 카드 선택 (클릭/키보드)
