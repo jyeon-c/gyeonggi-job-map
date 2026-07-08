@@ -5,13 +5,13 @@
 #   1) 고용24: BASIC_ADDR(자체 주소) → 지오코딩 대상 (경기 지역만 필터)
 #   2) 잡코리아: BIZ_NO ↔ 기업주소_사업자번호.csv BIZRNO 조인(숫자만, 10자리 패딩)
 #      → 주소 있으면 지오코딩 대상, 없으면 AREA_INFO 시군 중심점 근사
-#   3) KAKAO_REST_API_KEY 환경변수가 있으면 카카오 주소→좌표 API 호출(결과 캐시),
-#      없으면 전부 시군 중심점 근사 좌표 사용 (geocodePrecision='region_approx')
+#   3) 기업좌표_샘플은 BUSINO ↔ BIZ_NO가 일치하는 공고에 MAP_COOR_Y/X를 우선 적용
+#   4) KAKAO_REST_API_KEY가 있으면 나머지 상세주소를 지오코딩하고, 없으면 시군 중심점 근사
 #
 # 산출물:
 #   - data/processed/jobs.json        (통합 정제 데이터, ERD job_posting 필드 기준)
-#   - frontend/js/jobs-data.js        (프런트 소비용, var JOBS_DATA = [...])
 #   - data/processed/geocode-cache.json (지오코딩 결과 캐시, 재실행 시 재사용)
+#   - data/processed/data-quality-report.json (중복·결측·형식·매핑 감사 결과)
 #
 # 실행: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-jobs-data.ps1
 # ============================================================
@@ -59,6 +59,14 @@ function Normalize-BizNo([string]$raw) {
     $digits = $raw -replace "\D", ""
     if (-not $digits) { return $null }
     return $digits.PadLeft(10, "0")
+}
+
+function Add-CodeMap($target, $rows, [string]$groupCode) {
+    foreach ($row in $rows) {
+        if ($row.GRP_CD -eq $groupCode -and $row.USE_YN -eq "Y" -and $row.DEL_YN -eq "N") {
+            $target[$row.CMN_CD.Trim()] = $row.CMN_NM.Trim()
+        }
+    }
 }
 
 function Map-Career([string]$v) {
@@ -199,10 +207,35 @@ $gy24 = Import-Csv (Join-Path $dataDir "채용공고_고용24.csv") -Encoding UT
 $jk   = Import-Csv (Join-Path $dataDir "채용공고_잡코리아.csv") -Encoding UTF8
 $addrCsv = Import-Csv (Join-Path $dataDir "기업주소_사업자번호.csv") -Encoding UTF8
 $coordCsv = Import-Csv (Join-Path $dataDir "기업좌표_샘플.csv") -Encoding UTF8
+$careerCodes = Import-Csv (Join-Path $dataDir "공통코드_경력.csv") -Encoding UTF8
+$educationCodes = Import-Csv (Join-Path $dataDir "공통코드_학력.csv") -Encoding UTF8
+$employmentCodes = Import-Csv (Join-Path $dataDir "공통코드_고용형태.csv") -Encoding UTF8
+$companyJobCodes = Import-Csv (Join-Path $dataDir "공통코드_기업채용.csv") -Encoding UTF8
+$worknetJobCodes = Import-Csv (Join-Path $dataDir "직종분류\직종분류_03_고용24_워크넷.csv") -Encoding UTF8
+
+$gy24RawCount = $gy24.Count
+$jkRawCount = $jk.Count
+$gy24 = @($gy24 | Where-Object { $_.USE_YN -eq "Y" -and $_.DEL_YN -eq "N" })
+$jk = @($jk | Where-Object { $_.USE_YN -eq "Y" -and $_.DEL_YN -eq "N" })
+$inactiveCount = ($gy24RawCount + $jkRawCount) - ($gy24.Count + $jk.Count)
+$jkActiveCount = $jk.Count
+
+# 데이터 안내와 직종분류 문서에 정의된 공식 코드표. 코드가 없는 행만 원문 텍스트로 보완한다.
+$gyCareerMap = @{}; Add-CodeMap $gyCareerMap $careerCodes "CMMN_100"
+$jkCareerMap = @{}; Add-CodeMap $jkCareerMap $careerCodes "CMMN_122"
+$gyEducationMap = @{}; Add-CodeMap $gyEducationMap $educationCodes "CMMN_101"
+$jkEducationMap = @{}; Add-CodeMap $jkEducationMap $educationCodes "CMMN_124"
+$jkEmploymentMap = @{}; Add-CodeMap $jkEmploymentMap $employmentCodes "CMMN_125"
+$commonJobMap = @{}; Add-CodeMap $commonJobMap $companyJobCodes "CMMN_276"
+$worknetJobMap = @{}
+foreach ($row in $worknetJobCodes) {
+    if ($row.USE_YN -eq "Y" -and $row.DEL_YN -eq "N") {
+        $worknetJobMap[$row.CMN_CD.Trim().PadLeft(6, "0")] = $row.CMN_NM.Trim()
+    }
+}
 
 # 같은 회사·제목·근무지역으로 연속 재등록된 공고는 최신 원본만 남긴다.
 # 지역이 다른 동일 제목 공고(예: 같은 회사의 수원 3개 구 채용)는 별도 공고로 유지한다.
-$jkRawCount = $jk.Count
 $dedupWinners = @{}
 foreach ($r in $jk) {
     $dedupKey = (("{0}|{1}|{2}" -f $r.COM_NAME, $r.GI_SUBJECT, $r.AREA_INFO) -replace "\s+", " ").Trim().ToLowerInvariant()
@@ -216,7 +249,7 @@ $jk = @($jk | Where-Object {
     $key = (("{0}|{1}|{2}" -f $_.COM_NAME, $_.GI_SUBJECT, $_.AREA_INFO) -replace "\s+", " ").Trim().ToLowerInvariant()
     $dedupWinners[$key].GI_NO -eq $_.GI_NO
 })
-$duplicateCount = $jkRawCount - $jk.Count
+$duplicateCount = $jkActiveCount - $jk.Count
 
 # 사업자번호 → 주소 조인 맵
 $addrMap = @{}
@@ -229,14 +262,21 @@ foreach ($a in $addrCsv) {
 $companyCoordMap = @{}
 foreach ($c in $coordCsv) {
     $k = Normalize-BizNo $c.BUSINO
-    if ($k -and -not $companyCoordMap.ContainsKey($k) -and $c.MAP_COOR_Y -and $c.MAP_COOR_X) {
-        $companyCoordMap[$k] = @{ lat = [double]$c.MAP_COOR_Y; lng = [double]$c.MAP_COOR_X }
+    if ($k -and -not $companyCoordMap.ContainsKey($k) -and $c.USE_YN -eq "Y" -and
+        $c.MAP_COOR_Y -and $c.MAP_COOR_X) {
+        $lat = [double]$c.MAP_COOR_Y; $lng = [double]$c.MAP_COOR_X
+        if ($lat -ge 33 -and $lat -le 39.5 -and $lng -ge 124 -and $lng -le 132) {
+            # 원본 데이터사전 정의: MAP_COOR_Y=위도(latitude), MAP_COOR_X=경도(longitude)
+            $companyCoordMap[$k] = @{ lat = $lat; lng = $lng }
+        }
     }
 }
 
 # ---------- 통합 레코드 생성 ----------
 $jobs = New-Object System.Collections.Generic.List[object]
 $seq = 0
+$manualCoordCount = 0; $companyCoordCount = 0; $geocodedCount = 0; $approxCoordCount = 0
+$gyJobCodeFallback = 0; $jkJobCodeFallback = 0
 
 # --- 고용24 (공공): 경기 지역만 ---
 foreach ($r in $gy24) {
@@ -248,25 +288,38 @@ foreach ($r in $gy24) {
     $detail = $r.DETAIL_ADDR.Trim()
     if ($detail -and $detail -ne "." -and $detail -ne "null") { $addr = "$addr $detail" }
 
-    $coord = Get-KakaoCoord $r.BASIC_ADDR
+    $bizNo = Normalize-BizNo $r.BIZ_NO
+    $coord = if ($bizNo -and $companyCoordMap.ContainsKey($bizNo)) { $companyCoordMap[$bizNo] } else { $null }
     $precision = "exact"
+    if ($coord) { $companyCoordCount++ }
+    if (-not $coord) {
+        $coord = Get-KakaoCoord $r.BASIC_ADDR
+        if ($coord) { $geocodedCount++ }
+    }
     if (-not $coord) {
         $coord = Get-ApproxCoord $region $seq
         $precision = "region_approx"
+        if ($coord) { $approxCoordCount++ }
     }
 
     $salary = ("{0} {1}" -f $r.SAL_TP_NM, $r.SAL).Trim()
+    $careerName = if ($gyCareerMap.ContainsKey($r.CAREER_CD)) { $gyCareerMap[$r.CAREER_CD] } else { $r.CAREER }
+    $educationCode = $r.MIN_EDUBG_CD.PadLeft(2, "0")
+    $educationName = if ($gyEducationMap.ContainsKey($educationCode)) { $gyEducationMap[$educationCode] } else { $r.MIN_EDUBG }
+    $worknetCode = $r.JOBS_CD.PadLeft(6, "0")
+    if ($worknetJobMap.ContainsKey($worknetCode)) { $jobName = $worknetJobMap[$worknetCode] }
+    else { $jobName = $r.JOBS_NM; $gyJobCodeFallback++ }
 
     $jobs.Add([PSCustomObject]@{
         id = $seq
         source = "public"; sourceName = "고용24"
         title = $r.TITLE.Trim(); company = $r.COMPANY.Trim()
-        bizNo = Normalize-BizNo $r.BIZ_NO
+        bizNo = $bizNo
         region = $region; addressRaw = $addr
-        career = Map-Career $r.CAREER; careerRaw = $r.CAREER
-        education = Map-Education $r.MIN_EDUBG; educationRaw = $r.MIN_EDUBG
+        career = Map-Career $careerName; careerRaw = $r.CAREER
+        education = Map-Education $educationName; educationRaw = $r.MIN_EDUBG
         empType = Map-EmpType-Gy24 $r.EMP_TP_NM
-        jobCategory = Map-JobCategory $r.JOBS_NM
+        jobCategory = Map-JobCategory $jobName
         salary = $salary
         salaryMin = Parse-SalaryMin $salary
         postedAt = Parse-DotDate $r.WANTED_REG_DT
@@ -307,20 +360,29 @@ foreach ($r in $jk) {
     if ($override) {
         $coord = @{ lat = [double]$override.lat; lng = [double]$override.lng }
         $precision = "exact"
+        $manualCoordCount++
     } elseif ($bizNo -and $companyCoordMap.ContainsKey($bizNo)) {
         $coord = $companyCoordMap[$bizNo]
         $precision = "exact"
+        $companyCoordCount++
     } elseif ($addr) {
         $coord = Get-KakaoCoord $addr
-        if ($coord) { $precision = "exact" }
+        if ($coord) { $precision = "exact"; $geocodedCount++ }
     }
     if (-not $coord) {
         $coord = Get-ApproxCoord $r.AREA_INFO $seq
         $precision = if ($coord) { "region_approx" } else { $null }
+        if ($coord) { $approxCoordCount++ }
     }
 
     $salary = $r.PAY_INFO.Trim()
     if ($r.PAY_TERM_INFO) { $salary = "$salary $($r.PAY_TERM_INFO.Trim())" }
+    $careerName = if ($jkCareerMap.ContainsKey($r.GI_CAREER_CD)) { $jkCareerMap[$r.GI_CAREER_CD] } else { $r.CAREER_INFO }
+    $educationName = if ($jkEducationMap.ContainsKey($r.GI_EDU_CUTLINE_CD)) { $jkEducationMap[$r.GI_EDU_CUTLINE_CD] } else { $r.EDU_CUTLINE_INFO }
+    $employmentCode = (($r.GI_JOB_TYPE_CD -split ",")[0].TrimStart("0"))
+    $employmentName = if ($jkEmploymentMap.ContainsKey($employmentCode)) { $jkEmploymentMap[$employmentCode] } else { $r.JOB_TYPE_INFO }
+    if ($commonJobMap.ContainsKey($r.CL_CD)) { $jobName = $commonJobMap[$r.CL_CD] }
+    else { $jobName = $r.PART_NO_INFO; $jkJobCodeFallback++ }
 
     $jobs.Add([PSCustomObject]@{
         id = $seq
@@ -329,10 +391,10 @@ foreach ($r in $jk) {
         bizNo = $bizNo
         region = $r.AREA_INFO.Trim()
         addressRaw = if ($addr) { $addr } else { $r.AREA_INFO.Trim() }
-        career = Map-Career $r.CAREER_INFO; careerRaw = $r.CAREER_INFO
-        education = Map-Education $r.EDU_CUTLINE_INFO; educationRaw = $r.EDU_CUTLINE_INFO
-        empType = Map-EmpType-JobKorea $r.JOB_TYPE_INFO
-        jobCategory = Map-JobCategory $r.PART_NO_INFO
+        career = Map-Career $careerName; careerRaw = $r.CAREER_INFO
+        education = Map-Education $educationName; educationRaw = $r.EDU_CUTLINE_INFO
+        empType = Map-EmpType-JobKorea $employmentName
+        jobCategory = Map-JobCategory $jobName
         salary = $salary
         salaryMin = Parse-SalaryMin $salary
         postedAt = Parse-YmdDate $r.GI_W_DATE
@@ -344,11 +406,59 @@ foreach ($r in $jk) {
     })
 }
 
+# ---------- 품질 검증: 중복·결측·형식 불일치는 산출 전에 실패시킨다 ----------
+$duplicateIds = @($jobs | Group-Object id | Where-Object Count -gt 1).Count
+$duplicateJobs = @($jobs | Group-Object {
+    (("{0}|{1}|{2}" -f $_.company, $_.title, $_.region) -replace "\s+", " ").Trim().ToLowerInvariant()
+} | Where-Object Count -gt 1).Count
+$missingRequired = @($jobs | Where-Object {
+    [string]::IsNullOrWhiteSpace($_.title) -or [string]::IsNullOrWhiteSpace($_.company) -or
+    [string]::IsNullOrWhiteSpace($_.region) -or [string]::IsNullOrWhiteSpace($_.addressRaw) -or
+    [string]::IsNullOrWhiteSpace($_.postedAt) -or [string]::IsNullOrWhiteSpace($_.url) -or
+    $null -eq $_.lat -or $null -eq $_.lng
+}).Count
+$invalidCoordinates = @($jobs | Where-Object {
+    $_.lat -lt 33 -or $_.lat -gt 39.5 -or $_.lng -lt 124 -or $_.lng -gt 132
+}).Count
+$invalidDates = @($jobs | Where-Object {
+    ($_.postedAt -and $_.postedAt -notmatch "^\d{4}-\d{2}-\d{2}$") -or
+    ($_.deadline -and $_.deadline -notmatch "^\d{4}-\d{2}-\d{2}$")
+}).Count
+$invalidFormats = @($jobs | Where-Object {
+    ($_.bizNo -and $_.bizNo -notmatch "^\d{10}$") -or $_.url -notmatch "^https?://" -or
+    $_.career -notin @("무관", "신입", "경력") -or
+    $_.education -notin @("무관", "고졸 이상", "대졸 이상") -or
+    $_.empType -notin @("정규직", "계약직", "파트타임") -or
+    $_.jobCategory -notin @("IT·개발", "의료·복지", "교육", "건설·설비", "운전·물류", "영업·판매", "생산·제조", "서비스", "사무·관리", "기타")
+}).Count
+$duplicateUrls = @($jobs | Group-Object url | Where-Object Count -gt 1).Count
+$exact = @($jobs | Where-Object { $_.geocodePrecision -eq "exact" }).Count
+$approx = @($jobs | Where-Object { $_.geocodePrecision -eq "region_approx" }).Count
+$noCoord = @($jobs | Where-Object { $null -eq $_.lat -or $null -eq $_.lng }).Count
+if ($duplicateIds -or $duplicateJobs -or $duplicateUrls -or $missingRequired -or $invalidCoordinates -or $invalidDates -or $invalidFormats) {
+    throw "품질 검증 실패: ID중복=$duplicateIds 공고중복=$duplicateJobs URL중복=$duplicateUrls 필수결측=$missingRequired 좌표형식=$invalidCoordinates 날짜형식=$invalidDates 기타형식=$invalidFormats"
+}
+
 # ---------- 산출물 저장 ----------
 # 산출물은 backend 시딩(JobDataLoader) 및 prod 이미지가 소비하는 jobs.json 단일 파일.
 # (프런트는 더 이상 정적 데이터를 쓰지 않고 /api/jobs 로 조회한다)
 $json = ConvertTo-Json $jobs -Depth 4 -Compress
 [System.IO.File]::WriteAllText((Join-Path $outDir "jobs.json"), $json, $utf8NoBom)
+
+$qualityReport = [ordered]@{
+    input = [ordered]@{ work24 = $gy24RawCount; jobKorea = $jkRawCount; total = $gy24RawCount + $jkRawCount }
+    excluded = [ordered]@{ deletedOrInactive = $inactiveCount; nonGyeonggiWork24 = $gy24.Count - $gy24Count; duplicateJobKorea = $duplicateCount }
+    output = [ordered]@{ work24 = $gy24Count; jobKorea = $jk.Count; total = $jobs.Count }
+    coordinates = [ordered]@{ manualOverride = $manualCoordCount; companySample = $companyCoordCount; addressGeocoded = $geocodedCount; regionApprox = $approxCoordCount; missing = $noCoord }
+    mappingFallbacks = [ordered]@{ work24JobCategory = $gyJobCodeFallback; jobKoreaJobCategory = $jkJobCodeFallback }
+    optionalMissing = [ordered]@{
+        deadline = @($jobs | Where-Object { $null -eq $_.deadline }).Count
+        salaryMin = @($jobs | Where-Object { $null -eq $_.salaryMin }).Count
+        bizNo = @($jobs | Where-Object { $null -eq $_.bizNo }).Count
+    }
+    validation = [ordered]@{ duplicateIds = $duplicateIds; duplicateJobs = $duplicateJobs; duplicateUrls = $duplicateUrls; missingRequired = $missingRequired; invalidCoordinates = $invalidCoordinates; invalidDates = $invalidDates; invalidFormats = $invalidFormats }
+}
+[System.IO.File]::WriteAllText((Join-Path $outDir "data-quality-report.json"), (ConvertTo-Json $qualityReport -Depth 4), $utf8NoBom)
 
 # 지오코딩 캐시 저장
 if ($geoCache.Count -gt 0) {
@@ -356,15 +466,15 @@ if ($geoCache.Count -gt 0) {
 }
 
 # ---------- 결과 요약 ----------
-$exact = @($jobs | Where-Object { $_.geocodePrecision -eq "exact" }).Count
-$approx = @($jobs | Where-Object { $_.geocodePrecision -eq "region_approx" }).Count
-$noCoord = @($jobs | Where-Object { $null -eq $_.lat }).Count
 Write-Host ""
 Write-Host "=== 빌드 완료 ==="
 Write-Host "총 $($jobs.Count)건 (고용24/경기 $gy24Count + 잡코리아 $($jk.Count))"
-Write-Host "잡코리아 중복 제거: ${duplicateCount}건 (원본 $jkRawCount → $($jk.Count))"
+Write-Host "삭제/비활성 제외: $inactiveCount 건 (고용24+잡코리아 원본 기준)"
+Write-Host "잡코리아 중복 제거: ${duplicateCount}건 (활성 $jkActiveCount → $($jk.Count))"
 Write-Host "잡코리아 정확 주소 확보: $jkExactAddr/$($jk.Count)"
 Write-Host "좌표: exact $exact / region_approx $approx / 없음 $noCoord"
+Write-Host "좌표 출처: MAP_COOR_X/Y $companyCoordCount / 수동검증 $manualCoordCount / 주소지오코딩 $geocodedCount / 지역근사 $approxCoordCount"
+Write-Host "품질 검증: ID·공고·URL중복 0 / 필수결측 0 / 좌표·날짜·코드형식오류 0"
 if (-not $kakaoKey) { Write-Host "※ KAKAO_REST_API_KEY 미설정 → 제공·수동 좌표 외에는 시군 중심점 근사. 키 설정 후 재실행하면 상세주소 좌표가 정밀화됨" }
 else { Write-Host "카카오 API 호출: $script:apiCalls 건 (캐시 재사용 포함 총 $($geoCache.Count)건 캐시)" }
 Write-Host "산출물: data\processed\jobs.json (백엔드 시딩용)"

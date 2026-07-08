@@ -1,0 +1,42 @@
+{
+    "input":  {
+                  "work24":  100,
+                  "jobKorea":  500,
+                  "total":  600
+              },
+    "excluded":  {
+                     "deletedOrInactive":  67,
+                     "nonGyeonggiWork24":  73,
+                     "duplicateJobKorea":  0
+                 },
+    "output":  {
+                   "work24":  27,
+                   "jobKorea":  433,
+                   "total":  460
+               },
+    "coordinates":  {
+                        "manualOverride":  1,
+                        "companySample":  1,
+                        "addressGeocoded":  0,
+                        "regionApprox":  458,
+                        "missing":  0
+                    },
+    "mappingFallbacks":  {
+                             "work24JobCategory":  3,
+                             "jobKoreaJobCategory":  27
+                         },
+    "optionalMissing":  {
+                            "deadline":  47,
+                            "salaryMin":  272,
+                            "bizNo":  0
+                        },
+    "validation":  {
+                       "duplicateIds":  0,
+                       "duplicateJobs":  0,
+                       "duplicateUrls":  0,
+                       "missingRequired":  0,
+                       "invalidCoordinates":  0,
+                       "invalidDates":  0,
+                       "invalidFormats":  0
+                   }
+}
