@@ -635,51 +635,71 @@ body.has-brand .content { padding-top: calc(var(--header-h) + var(--filterbar-h)
 }
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 
-/* 임시 마커 (카카오맵 연동 전 목데이터 미리보기) */
+/* 지도 지역별 공고 집계 배지 */
 .map-markers { position: absolute; inset: 0; }
 
-.map-marker {
-  position: absolute;
-  transform: translate(-50%, -100%);
+.region-marker {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  border: none;
-  background: none;
-  padding: 0;
-  z-index: 10;
+  height: 38px;
+  padding: 0 13px 0 4px;
+  border: 1.5px solid var(--primary);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--primary-dark);
+  box-shadow: 0 3px 10px rgba(22, 49, 82, 0.22);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
 }
 
-.map-marker__pin {
-  width: 34px;
-  height: 34px;
-  border-radius: 50% 50% 50% 4px;
-  transform: rotate(-45deg);
-  background: var(--primary);
-  border: 2.5px solid #fff;
-  box-shadow: 0 2px 6px rgba(28, 39, 51, 0.35);
-  display: flex;
+.region-marker:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 14px rgba(22, 49, 82, 0.3);
+}
+
+.region-marker__count {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s, background 0.15s;
-}
-
-.map-marker__pin span {
-  transform: rotate(45deg);
+  min-width: 30px;
+  height: 30px;
+  margin-right: 8px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--primary);
   color: #fff;
   font-size: 12px;
   font-weight: 800;
 }
 
-.map-marker--public .map-marker__pin { background: var(--accent-public); }
+.region-marker.is-selected {
+  border-color: var(--danger);
+  color: var(--danger);
+}
 
-.map-marker:hover .map-marker__pin { transform: rotate(-45deg) scale(1.12); }
+.region-marker.is-selected .region-marker__count { background: var(--danger); }
 
-.map-marker.is-selected { z-index: 20; }
+.region-marker--fallback {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
 
-.map-marker.is-selected .map-marker__pin {
-  background: var(--danger);
-  transform: rotate(-45deg) scale(1.25);
+.region-marker--fallback:hover { transform: translate(-50%, calc(-50% - 2px)); }
+
+.map-hover-area {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(37, 99, 235, .75);
+  border-radius: 50%;
+  background: rgba(59, 130, 246, .18);
+  pointer-events: none;
+  z-index: 8;
 }
 
 /* 지도 위 선택 공고 미니 카드 */

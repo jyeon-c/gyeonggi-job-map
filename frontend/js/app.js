@@ -76,8 +76,9 @@
 
   /* ---------- 카카오맵 상태 ---------- */
   var kakaoMap = null;       // 지도 객체 (SDK 로드 성공 시)
-  var kakaoMarkers = [];     // 지도 위 마커 목록
+  var kakaoMarkers = [];     // 지도 위 지역 집계 오버레이 목록
   var markerImgCache = {};   // 색상별 MarkerImage 캐시
+  var hoverCircle = null;    // 리스트 hover 시 공고 위치를 강조하는 반투명 원
   var useKakao = false;      // false 면 플레이스홀더 폴백으로 동작
   var MARKER_COLORS = { public: "#0f766e", private: "#1a73d1", selected: "#dc2626" };
 
@@ -152,6 +153,11 @@
     var parts = region.split(",");
     if (parts.length === 1) return region;
     return parts[0].trim() + " 외 " + (parts.length - 1);
+  }
+
+  /* 지역 집계 배지용 이름. 복수 근무지는 첫 지역을 대표 위치로 사용한다. */
+  function regionName(region) {
+    return (region || "지역 미상").split(",")[0].trim();
   }
 
   function sourceLabel(src) {
@@ -569,40 +575,76 @@
     return img;
   }
 
-  function imageForJob(job) {
-    if (job.id === state.selectedId) return markerImage(MARKER_COLORS.selected, true);
-    return markerImage(MARKER_COLORS[job.source], false);
+  function groupJobsByRegion(jobs) {
+    var byRegion = {};
+    jobs.forEach(function (job) {
+      var name = regionName(job.region);
+      if (!byRegion[name]) {
+        byRegion[name] = { name: name, jobs: [], latSum: 0, lngSum: 0, coordCount: 0 };
+      }
+      var group = byRegion[name];
+      group.jobs.push(job);
+      if (job.lat != null && job.lng != null) {
+        group.latSum += job.lat;
+        group.lngSum += job.lng;
+        group.coordCount += 1;
+      }
+    });
+    return Object.keys(byRegion).map(function (key) {
+      var group = byRegion[key];
+      if (group.coordCount) {
+        group.lat = group.latSum / group.coordCount;
+        group.lng = group.lngSum / group.coordCount;
+      }
+      return group;
+    }).filter(function (group) { return group.coordCount > 0; });
   }
 
   function renderKakaoMarkers(jobs) {
     kakaoMarkers.forEach(function (m) { m.setMap(null); });
     kakaoMarkers = [];
 
-    jobs.forEach(function (job) {
-      if (job.lat == null || job.lng == null) return;
-      var mk = new kakao.maps.Marker({
+    groupJobsByRegion(jobs).forEach(function (group) {
+      var selected = group.jobs.some(function (job) { return job.id === state.selectedId; });
+      var content = document.createElement("button");
+      content.type = "button";
+      content.className = "region-marker" + (selected ? " is-selected" : "");
+      content.title = group.name + " 공고 " + group.jobs.length + "건";
+      content.innerHTML = '<span class="region-marker__count">' + group.jobs.length + '</span>' +
+        '<span class="region-marker__name">' + esc(group.name) + '</span>';
+
+      var overlay = new kakao.maps.CustomOverlay({
         map: kakaoMap,
-        position: new kakao.maps.LatLng(job.lat, job.lng),
-        image: imageForJob(job),
-        title: job.title,
-        zIndex: job.id === state.selectedId ? 10 : 1
+        position: new kakao.maps.LatLng(group.lat, group.lng),
+        content: content,
+        xAnchor: 0.5,
+        yAnchor: 0.5,
+        zIndex: selected ? 10 : 2
       });
-      mk.__job = job;
-      kakao.maps.event.addListener(mk, "click", function () {
-        selectJob(job.id, { scrollList: true });
+      overlay.__group = group;
+      content.addEventListener("click", function () {
+        if (group.jobs.length === 1) {
+          selectJob(group.jobs[0].id, { scrollList: true });
+          return;
+        }
+        kakaoMap.setLevel(Math.max(3, kakaoMap.getLevel() - 2));
+        kakaoMap.panTo(new kakao.maps.LatLng(group.lat, group.lng));
       });
-      kakaoMarkers.push(mk);
+      kakaoMarkers.push(overlay);
     });
   }
 
   function updateKakaoMarkerStyles() {
-    kakaoMarkers.forEach(function (mk) {
-      mk.setImage(imageForJob(mk.__job));
-      mk.setZIndex(mk.__job.id === state.selectedId ? 10 : 1);
+    kakaoMarkers.forEach(function (overlay) {
+      var selected = overlay.__group.jobs.some(function (job) { return job.id === state.selectedId; });
+      $(overlay.getContent()).toggleClass("is-selected", selected);
+      overlay.setZIndex(selected ? 10 : 2);
     });
     if (state.selectedId != null) {
-      var sel = kakaoMarkers.filter(function (mk) { return mk.__job.id === state.selectedId; })[0];
-      if (sel) kakaoMap.panTo(sel.getPosition());
+      var job = jobsById[state.selectedId];
+      if (job && job.lat != null && job.lng != null) {
+        kakaoMap.panTo(new kakao.maps.LatLng(job.lat, job.lng));
+      }
     }
   }
 
@@ -612,22 +654,55 @@
 
     var $wrap = $("#mapMarkers").empty();
 
-    jobs.forEach(function (job) {
-      if (job.lat == null || job.lng == null) return; // 좌표 미확보 공고는 마커 생략
-
-      var x = ((job.lng - BOUNDS.minLng) / (BOUNDS.maxLng - BOUNDS.minLng)) * 84 + 8; // 8~92%
-      var y = (1 - (job.lat - BOUNDS.minLat) / (BOUNDS.maxLat - BOUNDS.minLat)) * 78 + 12; // 12~90%
+    groupJobsByRegion(jobs).forEach(function (group) {
+      var x = ((group.lng - BOUNDS.minLng) / (BOUNDS.maxLng - BOUNDS.minLng)) * 84 + 8;
+      var y = (1 - (group.lat - BOUNDS.minLat) / (BOUNDS.maxLat - BOUNDS.minLat)) * 78 + 12;
+      var selected = group.jobs.some(function (job) { return job.id === state.selectedId; });
 
       var $marker = $(
-        '<button type="button" class="map-marker map-marker--' + job.source +
-            (job.id === state.selectedId ? " is-selected" : "") +
-            '" data-id="' + job.id + '" style="left:' + x.toFixed(2) + '%; top:' + y.toFixed(2) + '%"' +
-            ' title="' + esc(job.title) + '">' +
-          '<span class="map-marker__pin"><span>' + sourceLabel(job.source).charAt(0) + '</span></span>' +
+        '<button type="button" class="region-marker region-marker--fallback' +
+            (selected ? " is-selected" : "") + '" data-region="' + esc(group.name) +
+            '" style="left:' + x.toFixed(2) + '%; top:' + y.toFixed(2) + '%"' +
+            ' title="' + esc(group.name) + ' 공고 ' + group.jobs.length + '건">' +
+          '<span class="region-marker__count">' + group.jobs.length + '</span>' +
+          '<span class="region-marker__name">' + esc(group.name) + '</span>' +
         '</button>'
       );
       $wrap.append($marker);
     });
+  }
+
+  function clearHoverArea() {
+    if (hoverCircle) {
+      hoverCircle.setMap(null);
+      hoverCircle = null;
+    }
+    $("#mapMarkers .map-hover-area").remove();
+  }
+
+  function showHoverArea(job) {
+    clearHoverArea();
+    if (!job || job.lat == null || job.lng == null) return;
+
+    if (useKakao) {
+      hoverCircle = new kakao.maps.Circle({
+        map: kakaoMap,
+        center: new kakao.maps.LatLng(job.lat, job.lng),
+        radius: job.geocodePrecision === "exact" ? 700 : 2200,
+        strokeWeight: 2,
+        strokeColor: "#2563eb",
+        strokeOpacity: 0.75,
+        fillColor: "#3b82f6",
+        fillOpacity: 0.18
+      });
+      return;
+    }
+
+    var x = ((job.lng - BOUNDS.minLng) / (BOUNDS.maxLng - BOUNDS.minLng)) * 84 + 8;
+    var y = (1 - (job.lat - BOUNDS.minLat) / (BOUNDS.maxLat - BOUNDS.minLat)) * 78 + 12;
+    $("<span class=\"map-hover-area\"></span>")
+      .css({ left: x.toFixed(2) + "%", top: y.toFixed(2) + "%" })
+      .appendTo("#mapMarkers");
   }
 
   /* ---------- 렌더링: 지도 위 선택 미니 카드 ---------- */
@@ -668,12 +743,11 @@
     state.selectedId = (state.selectedId === id) ? null : id;
 
     $(".job-card").removeClass("is-selected");
-    $(".map-marker").removeClass("is-selected");
+    $(".region-marker").removeClass("is-selected");
     if (useKakao) updateKakaoMarkerStyles();
 
     if (state.selectedId != null) {
       $('.job-card[data-id="' + state.selectedId + '"]').addClass("is-selected");
-      $('.map-marker[data-id="' + state.selectedId + '"]').addClass("is-selected");
 
       // 마커 클릭으로 선택된 경우 리스트를 해당 카드 위치로 스크롤
       if (opts && opts.scrollList) {
@@ -794,6 +868,11 @@
       e.stopPropagation();
     });
 
+    // 카드에 마우스를 올리면 지도에서 해당 공고의 위치 범위를 반투명 원으로 강조한다.
+    $("#jobList").on("mouseenter", ".job-card", function () {
+      showHoverArea(jobsById[$(this).data("id")]);
+    }).on("mouseleave", ".job-card", clearHoverArea);
+
     // #9 목록 무한스크롤 — 바닥 근처에서 다음 묶음 추가 렌더(스크롤 위치 유지)
     $("#jobList").on("scroll", function () {
       var el = this;
@@ -816,10 +895,6 @@
     });
 
     // 마커 선택 → 리스트 스크롤 동기화
-    $("#mapMarkers").on("click", ".map-marker", function () {
-      selectJob($(this).data("id"), { scrollList: true });
-    });
-
     // 지도 위 미니 카드 닫기
     $("#mapSelected").on("click", ".map-selected__close", function () {
       selectJob(state.selectedId); // 토글로 해제
