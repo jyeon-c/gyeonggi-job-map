@@ -78,11 +78,12 @@
   var kakaoMap = null;       // 지도 객체 (SDK 로드 성공 시)
   var kakaoMarkers = [];     // 지도 위 지역 집계 오버레이 목록
   var markerImgCache = {};   // 색상별 MarkerImage 캐시
-  var hoverCircle = null;    // 리스트 hover 시 공고 위치를 강조하는 반투명 원
+  var hoverAreas = [];       // 리스트/지역 hover 시 지도 위에 그리는 원·행정경계
   var useKakao = false;      // false 면 플레이스홀더 폴백으로 동작
   var MARKER_COLORS = { public: "#0f766e", private: "#1a73d1", selected: "#dc2626" };
   var INDIVIDUAL_MARKER_LEVEL = 3; // 건물 단위로 아주 가깝게 확대한 경우에만 개별 공고 핀
   var lastMapLevel = null;          // 줌 변경 감지 → 지도 핀 단일 목록 상태 해제
+  var municipalities = [];          // 좌표 기준 지역명·경계 판정용 경기도 시·군·구 GeoJSON
 
   /* ---------- API ---------- */
   // 운영은 nginx 가 같은 오리진에서 /api 를 프록시하므로 apiBase="" 가 기본.
@@ -159,9 +160,86 @@
     return parts[0].trim() + " 외 " + (parts.length - 1);
   }
 
-  /* 지역 집계 배지용 이름. 복수 근무지는 첫 지역을 대표 위치로 사용한다. */
-  function regionName(region) {
-    return (region || "지역 미상").split(",")[0].trim();
+  function pointInRing(lng, lat, ring) {
+    var inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var xi = ring[i][0], yi = ring[i][1];
+      var xj = ring[j][0], yj = ring[j][1];
+      var crosses = ((yi > lat) !== (yj > lat)) &&
+        (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+      if (crosses) inside = !inside;
+    }
+    return inside;
+  }
+
+  function pointInPolygon(lng, lat, rings) {
+    if (!rings.length || !pointInRing(lng, lat, rings[0])) return false;
+    for (var i = 1; i < rings.length; i++) {
+      if (pointInRing(lng, lat, rings[i])) return false; // 내부 구멍
+    }
+    return true;
+  }
+
+  function featureContains(feature, lng, lat) {
+    var geometry = feature.geometry;
+    if (geometry.type === "Polygon") return pointInPolygon(lng, lat, geometry.coordinates);
+    return geometry.coordinates.some(function (polygon) {
+      return pointInPolygon(lng, lat, polygon);
+    });
+  }
+
+  function visitCoordinatePairs(value, visitor) {
+    if (value.length >= 2 && typeof value[0] === "number" && typeof value[1] === "number") {
+      visitor(value);
+      return;
+    }
+    value.forEach(function (child) { visitCoordinatePairs(child, visitor); });
+  }
+
+  /* 단순화된 해안·경계 밖 좌표는 가장 가까운 시·군 경계 꼭짓점으로 보정한다. */
+  function nearestMunicipality(lng, lat) {
+    var nearest = null;
+    var minDistance = Infinity;
+    municipalities.forEach(function (feature) {
+      visitCoordinatePairs(feature.geometry.coordinates, function (coord) {
+        var lngScale = Math.cos(lat * Math.PI / 180);
+        var dx = (coord[0] - lng) * lngScale;
+        var dy = coord[1] - lat;
+        var distance = dx * dx + dy * dy;
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearest = feature;
+        }
+      });
+    });
+    return nearest;
+  }
+
+  function municipalityForJob(job) {
+    if (job.__municipality !== undefined) return job.__municipality;
+    if (job.lat == null || job.lng == null) return null;
+    job.__municipality = municipalities.filter(function (feature) {
+      return featureContains(feature, job.lng, job.lat);
+    })[0] || nearestMunicipality(job.lng, job.lat);
+    return job.__municipality;
+  }
+
+  function mapRegionName(job) {
+    var municipality = municipalityForJob(job);
+    return municipality ? municipality.properties.name : "경기도 기타";
+  }
+
+  function loadMunicipalities() {
+    return fetch("data/gyeonggi-map-regions.geojson")
+      .then(function (res) {
+        if (!res.ok) throw new Error("행정경계 HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) { municipalities = data.features || []; })
+      .catch(function (err) {
+        municipalities = [];
+        if (window.console) console.error("[jobmap] 행정경계 로드 실패:", err);
+      });
   }
 
   function sourceLabel(src) {
@@ -592,9 +670,12 @@
   function groupJobsByRegion(jobs) {
     var byRegion = {};
     jobs.forEach(function (job) {
-      var name = regionName(job.region);
+      var municipality = municipalityForJob(job);
+      var name = municipality ? municipality.properties.name : "경기도 기타";
       if (!byRegion[name]) {
-        byRegion[name] = { name: name, jobs: [], latSum: 0, lngSum: 0, coordCount: 0 };
+        byRegion[name] = {
+          name: name, boundary: municipality, jobs: [], latSum: 0, lngSum: 0, coordCount: 0
+        };
       }
       var group = byRegion[name];
       group.jobs.push(job);
@@ -715,10 +796,8 @@
   }
 
   function clearHoverArea() {
-    if (hoverCircle) {
-      hoverCircle.setMap(null);
-      hoverCircle = null;
-    }
+    hoverAreas.forEach(function (area) { area.setMap(null); });
+    hoverAreas = [];
     $("#mapMarkers .map-hover-area").remove();
   }
 
@@ -729,7 +808,7 @@
     if (useKakao && kakaoMap.getLevel() <= INDIVIDUAL_MARKER_LEVEL) return;
 
     if (useKakao) {
-      hoverCircle = new kakao.maps.Circle({
+      hoverAreas.push(new kakao.maps.Circle({
         map: kakaoMap,
         center: new kakao.maps.LatLng(job.lat, job.lng),
         radius: job.geocodePrecision === "exact" ? 700 : 2200,
@@ -738,7 +817,7 @@
         strokeOpacity: 0.75,
         fillColor: "#3b82f6",
         fillOpacity: 0.18
-      });
+      }));
       return;
     }
 
@@ -749,28 +828,34 @@
       .appendTo("#mapMarkers");
   }
 
-  /* 지역 배지에 묶인 모든 공고 좌표를 감싸는 반투명 범위 표시 */
-  function showRegionArea(group) {
-    clearHoverArea();
-    if (!useKakao || !group || !group.coordCount) return;
-
-    var radius = 1200;
-    group.jobs.forEach(function (job) {
-      if (job.lat == null || job.lng == null) return;
-      var distanceM = haversineKm(group.lat, group.lng, job.lat, job.lng) * 1000;
-      radius = Math.max(radius, distanceM + 500);
+  function polygonPath(rings) {
+    return rings.map(function (ring) {
+      return ring.map(function (coord) { return new kakao.maps.LatLng(coord[1], coord[0]); });
     });
+  }
 
-    hoverCircle = new kakao.maps.Circle({
+  function drawBoundaryPolygon(rings) {
+    hoverAreas.push(new kakao.maps.Polygon({
       map: kakaoMap,
-      center: new kakao.maps.LatLng(group.lat, group.lng),
-      radius: radius,
+      path: polygonPath(rings),
       strokeWeight: 2,
       strokeColor: "#2563eb",
-      strokeOpacity: 0.75,
+      strokeOpacity: 0.8,
       fillColor: "#3b82f6",
-      fillOpacity: 0.14
-    });
+      fillOpacity: 0.16
+    }));
+  }
+
+  /* 좌표로 판정한 실제 시·군·구 행정경계를 반투명 폴리곤으로 표시 */
+  function showRegionArea(group) {
+    clearHoverArea();
+    if (!useKakao || !group || !group.boundary) return;
+    var geometry = group.boundary.geometry;
+    if (geometry.type === "Polygon") {
+      drawBoundaryPolygon(geometry.coordinates);
+      return;
+    }
+    geometry.coordinates.forEach(drawBoundaryPolygon);
   }
 
   /* ---------- 렌더링: 지도 위 선택 미니 카드 ---------- */
@@ -804,7 +889,7 @@
     }
     if (state.mapFocusedRegion != null) {
       var regionJobs = visibleJobs.filter(function (job) {
-        return regionName(job.region) === state.mapFocusedRegion;
+        return mapRegionName(job) === state.mapFocusedRegion;
       });
       if (regionJobs.length) return regionJobs;
       state.mapFocusedRegion = null;
@@ -1085,8 +1170,10 @@
     applyBranding();   // 위젯 임베드 분양처 브랜딩 먼저 적용
     bindEvents();
     renderFilterBar(); // 필터 칩은 데이터와 무관하게 먼저 그려둔다
-    reloadJobs();      // API 에서 초기 목록 로드
-    loadKakaoSdk();
+    loadMunicipalities().then(function () {
+      reloadJobs();    // 행정경계를 먼저 읽은 뒤 좌표 기준 지역 집계
+      loadKakaoSdk();
+    });
     setTimeout(maybePromptLocation, 900); // #3 최초 접속 위치 안내(1회)
   });
 
