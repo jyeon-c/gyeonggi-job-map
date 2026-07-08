@@ -723,6 +723,8 @@
   function showHoverArea(job) {
     clearHoverArea();
     if (!job || job.lat == null || job.lng == null) return;
+    // 개별 공고 핀이 보일 만큼 확대된 상태에서는 큰 반경 원이 지도를 가리므로 생략한다.
+    if (useKakao && kakaoMap.getLevel() <= INDIVIDUAL_MARKER_LEVEL) return;
 
     if (useKakao) {
       hoverCircle = new kakao.maps.Circle({
