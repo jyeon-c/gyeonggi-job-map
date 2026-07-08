@@ -615,6 +615,21 @@
     var timer = setTimeout(function () { finish(); }, 12000);
   }
 
+  // PC 최초 진입은 Cloudflare IP 위치를 우선 사용한다. 헤더 미설정/직접 접속이면 GPS로 폴백한다.
+  function locateInitial() {
+    if (isMobile()) { locate(); return; }
+    var $btn = $("#btnLocate").addClass("is-busy");
+    fetch(API_BASE + "/api/location", { cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function (data) {
+        $btn.removeClass("is-busy");
+        if (!data.available || data.lat == null || data.lng == null) { locate(); return; }
+        applyMyLocation(+data.lat, +data.lng);
+        showToast("IP 기반의 대략적인 위치입니다. 더 정확한 위치는 현재 위치 버튼을 이용해 주세요.");
+      })
+      .catch(function () { $btn.removeClass("is-busy"); locate(); });
+  }
+
   /* ---------- #5 주소/장소 검색 ---------- */
   // 지명/주소로 보이는 검색어인지(직무 키워드 "개발/사무" 등과 구분).
   // 장소 검색(Places)이 너무 관대해 아무 단어나 좌표를 주므로, 지명 접미사가 있을 때만 위치로 취급.
@@ -1162,7 +1177,7 @@
     $("#geoAgree").on("click", function () {
       $("#geoConsent").prop("hidden", true);
       markGeoPrompted();
-      locate();
+      locateInitial();
     });
     $("#geoCancel").on("click", function () {
       $("#geoConsent").prop("hidden", true);
@@ -1189,7 +1204,7 @@
     var prompted;
     try { prompted = localStorage.getItem(GEO_KEY); } catch (e) { prompted = null; }
     if (prompted) return;                 // 재방문은 안내 안 함
-    // 모바일=GPS 안내, PC=IP 기반이 원칙이나 외부 IP 조회 미사용 → 경기 기본 + 위치 사용 제안
+    // 모바일은 GPS, PC는 Cloudflare IP 위치를 우선 사용하고 불가하면 브라우저 위치로 폴백한다.
     var $c = $("#geoConsent");
     $c.find(".geo-consent__text").html(
       (isMobile()

@@ -1,6 +1,6 @@
 /**
  * 관리자 통계 페이지 — GET /api/admin/stats(HTTP Basic 인증)를 받아 막대그래프로 표시.
- * (요구사항 11번) 자격증명은 sessionStorage 에만 보관(탭 닫으면 소멸), 매 요청 Authorization 헤더로 전송.
+ * (보너스 기능) 자격증명은 sessionStorage 에만 보관(탭 닫으면 소멸), 매 요청 Authorization 헤더로 전송.
  */
 (function ($) {
   "use strict";

@@ -59,7 +59,7 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
   @Query("select distinct j.sourceName from JobPosting j order by j.sourceName")
   List<String> findDistinctSources();
 
-  /* ---------- 관리자 통계 집계 (요구사항 11번) ---------- */
+  /* ---------- 관리자 통계 집계 (보너스 기능) ---------- */
 
   /** group by 결과 투영: key(구분값) + count(공고 수) */
   interface KeyCount {

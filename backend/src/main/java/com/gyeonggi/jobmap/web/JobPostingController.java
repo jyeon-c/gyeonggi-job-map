@@ -4,11 +4,13 @@ import com.gyeonggi.jobmap.service.JobPostingService;
 import com.gyeonggi.jobmap.web.dto.JobResponse;
 import com.gyeonggi.jobmap.web.dto.NearbyJobResponse;
 import com.gyeonggi.jobmap.web.dto.PageResponse;
+import com.gyeonggi.jobmap.web.dto.ClientLocationResponse;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -61,5 +63,24 @@ public class JobPostingController {
   @GetMapping("/codes/{group}")
   public List<String> codes(@PathVariable String group) {
     return service.codes(group);
+  }
+
+  /** PC 최초 위치: Cloudflare 방문자 위치 헤더가 활성화된 경우에만 IP 기반 좌표 제공. */
+  @GetMapping("/location")
+  public ClientLocationResponse location(
+      @RequestHeader(value = "CF-IPLatitude", required = false) String latitude,
+      @RequestHeader(value = "CF-IPLongitude", required = false) String longitude,
+      @RequestHeader(value = "CF-IPCity", required = false) String city,
+      @RequestHeader(value = "CF-Region", required = false) String region) {
+    try {
+      double lat = Double.parseDouble(latitude);
+      double lng = Double.parseDouble(longitude);
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return ClientLocationResponse.unavailable();
+      }
+      return new ClientLocationResponse(true, lat, lng, city, region, "cloudflare-ip");
+    } catch (RuntimeException ignored) {
+      return ClientLocationResponse.unavailable();
+    }
   }
 }

@@ -163,6 +163,24 @@ class JobPostingApiTest {
   }
 
   @Test
+  void PC_IP_기본위치는_Cloudflare_좌표_헤더를_사용한다() throws Exception {
+    mockMvc.perform(get("/api/location")
+            .header("CF-IPLatitude", "37.5665")
+            .header("CF-IPLongitude", "126.9780")
+            .header("CF-IPCity", "Seoul")
+            .header("CF-Region", "Seoul"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(true))
+        .andExpect(jsonPath("$.lat").value(37.5665))
+        .andExpect(jsonPath("$.lng").value(126.9780))
+        .andExpect(jsonPath("$.source").value("cloudflare-ip"));
+
+    mockMvc.perform(get("/api/location"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.available").value(false));
+  }
+
+  @Test
   void 관리자_통계는_인증없이_401() throws Exception {
     mockMvc.perform(get("/api/admin/stats"))
         .andExpect(status().isUnauthorized());

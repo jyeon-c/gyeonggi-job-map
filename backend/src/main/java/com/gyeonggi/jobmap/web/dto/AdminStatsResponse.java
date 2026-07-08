@@ -3,7 +3,7 @@ package com.gyeonggi.jobmap.web.dto;
 import java.util.List;
 
 /**
- * 관리자 통계 응답 (요구사항 11번).
+ * 관리자 통계 응답 (보너스 기능).
  * 각 축은 (구분값, 공고 수) 목록. 지역은 시·군 단위 상위 N 개.
  */
 public record AdminStatsResponse(
