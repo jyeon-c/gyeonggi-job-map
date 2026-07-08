@@ -24,6 +24,15 @@ if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
+# ---------- 공고별 수동 좌표 보강 ----------
+# 원본에 상세주소가 없지만 공식 지점 정보로 정확한 좌표를 확인한 공고에 우선 적용한다.
+$overridePath = Join-Path $dataDir "geocode-overrides.json"
+$coordOverrides = @{}
+if (Test-Path $overridePath) {
+    $overrideData = Get-Content $overridePath -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($p in $overrideData.PSObject.Properties) { $coordOverrides[$p.Name] = $p.Value }
+}
+
 # ---------- 경기도 시·군 중심점 좌표 (근사용) ----------
 $CENTROIDS = @{
     "수원시" = @(37.2636, 127.0286); "성남시" = @(37.4200, 127.1267)
@@ -248,9 +257,18 @@ foreach ($r in $jk) {
     $seq++
     $bizNo = Normalize-BizNo $r.BIZ_NO
 
+    $jobNo = $null
+    if ($r.JK_URL -match "/GI_Read/(\d+)") { $jobNo = $Matches[1] }
+    $overrideKey = if ($jobNo) { "jobkorea:$jobNo" } else { $null }
+    $override = if ($overrideKey -and $coordOverrides.ContainsKey($overrideKey)) {
+        $coordOverrides[$overrideKey]
+    } else { $null }
+
     # 사업자번호 조인으로 정확 주소 확보 시도
     $addr = $null
-    if ($bizNo -and $addrMap.ContainsKey($bizNo)) {
+    if ($override) {
+        $addr = $override.address
+    } elseif ($bizNo -and $addrMap.ContainsKey($bizNo)) {
         $a = $addrMap[$bizNo]
         $addr = $a.HDQTR_KOR_ADRS.Trim()
         if ($a.HDQTR_KOR_DETAIL_ADRS) { $addr = "$addr $($a.HDQTR_KOR_DETAIL_ADRS.Trim())" }
@@ -258,7 +276,10 @@ foreach ($r in $jk) {
     }
 
     $coord = $null; $precision = $null
-    if ($addr) {
+    if ($override) {
+        $coord = @{ lat = [double]$override.lat; lng = [double]$override.lng }
+        $precision = "exact"
+    } elseif ($addr) {
         $coord = Get-KakaoCoord $addr
         if ($coord) { $precision = "exact" }
     }
