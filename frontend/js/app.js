@@ -561,27 +561,52 @@
       return;
     }
     var $btn = $("#btnLocate").addClass("is-busy");
-    navigator.geolocation.getCurrentPosition(
-      function (p) {
-        $btn.removeClass("is-busy");
-        applyMyLocation(p.coords.latitude, p.coords.longitude);
-        // 데스크톱 등 GPS 없는 환경은 IP/Wi-Fi 기반이라 오차가 큼(수 km) → 안내
-        var acc = p.coords.accuracy;
-        if (acc && acc > 3000) {
-          showToast("현재 위치 정확도가 낮습니다(±" + Math.round(acc / 1000) + "km). 정확한 위치는 검색창에 동/역 이름을 입력해 주세요.");
-        }
+    var best = null;
+    var finished = false;
+    var watchId = null;
+
+    function finish(error) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      if (watchId != null) navigator.geolocation.clearWatch(watchId);
+      $btn.removeClass("is-busy");
+
+      if (error && error.code === error.PERMISSION_DENIED) {
+        alert("위치 접근이 거부되었습니다. 브라우저 주소창의 위치 권한을 허용해 주세요.");
+        return;
+      }
+      if (!best) {
+        alert("현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        return;
+      }
+
+      var accuracy = Number(best.coords.accuracy) || Infinity;
+      // PC의 IP/Wi-Fi 위치가 다른 도시를 가리키는 경우 지도에 적용하지 않는다.
+      if (accuracy > 3000) {
+        showToast("브라우저 위치 오차가 너무 큽니다(±" + Math.round(accuracy / 1000) +
+          "km). 지도 이동을 취소했습니다. 검색창에 동·역 이름을 입력해 주세요.");
+        return;
+      }
+
+      applyMyLocation(best.coords.latitude, best.coords.longitude);
+      if (accuracy > 1000) {
+        showToast("현재 위치 오차 범위는 약 ±" + (accuracy / 1000).toFixed(1) + "km입니다.");
+      }
+    }
+
+    // 첫 IP 추정값을 즉시 쓰지 않고 여러 측정값 중 정확도가 가장 좋은 값을 선택한다.
+    watchId = navigator.geolocation.watchPosition(
+      function (position) {
+        if (!best || position.coords.accuracy < best.coords.accuracy) best = position;
+        if (position.coords.accuracy <= 500) finish();
       },
-      function (err) {
-        $btn.removeClass("is-busy");
-        // #4 오차/거부 안내
-        var msg = err.code === err.PERMISSION_DENIED
-          ? "위치 접근이 거부되었습니다. 브라우저 주소창의 위치 권한을 허용해 주세요."
-          : "현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.";
-        alert(msg);
+      function (error) {
+        if (error.code === error.PERMISSION_DENIED) finish(error);
       },
-      // maximumAge:0 → 캐시된(오래된) 위치 재사용 금지, 매번 새로 측정. 고정확도·타임아웃 15초.
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
+    var timer = setTimeout(function () { finish(); }, 12000);
   }
 
   /* ---------- #5 주소/장소 검색 ---------- */
