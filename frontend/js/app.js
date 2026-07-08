@@ -95,7 +95,8 @@
     filters: { source: "", career: "", education: "", empType: "", jobCategory: "", minSalary: "" },
     sort: "latest",
     selectedId: null,
-    mapFocusedId: null
+    mapFocusedId: null,
+    mapFocusedRegion: null
   };
 
   // 현재 조건으로 API 에서 받아온 공고 목록(정렬 전 원본)과 id 색인
@@ -255,6 +256,7 @@
   function reloadJobs(opts) {
     opts = opts || {};
     state.mapFocusedId = null;
+    state.mapFocusedRegion = null;
     var seq = ++loadSeq;
     setListLoading();
     fetchJobs()
@@ -413,6 +415,7 @@
       var level = kakaoMap.getLevel();
       if (lastMapLevel !== null && level !== lastMapLevel) {
         state.mapFocusedId = null;
+        state.mapFocusedRegion = null;
       }
       lastMapLevel = level;
       viewBounds = kakaoMap.getBounds();
@@ -640,7 +643,8 @@
     }
 
     groupJobsByRegion(jobs).forEach(function (group) {
-      var selected = group.jobs.some(function (job) { return job.id === state.selectedId; });
+      var selected = state.mapFocusedRegion === group.name ||
+        group.jobs.some(function (job) { return job.id === state.selectedId; });
       var content = document.createElement("button");
       content.type = "button";
       content.className = "region-marker" + (selected ? " is-selected" : "");
@@ -657,13 +661,10 @@
         zIndex: selected ? 10 : 2
       });
       overlay.__group = group;
+      content.addEventListener("mouseenter", function () { showRegionArea(group); });
+      content.addEventListener("mouseleave", clearHoverArea);
       content.addEventListener("click", function () {
-        if (group.jobs.length === 1) {
-          focusJobFromMap(group.jobs[0]);
-          return;
-        }
-        kakaoMap.setLevel(Math.max(3, kakaoMap.getLevel() - 2));
-        kakaoMap.panTo(new kakao.maps.LatLng(group.lat, group.lng));
+        focusRegionFromMap(group);
       });
       kakaoMarkers.push(overlay);
     });
@@ -676,7 +677,8 @@
         overlay.setZIndex(overlay.__job.id === state.selectedId ? 10 : 2);
         return;
       }
-      var selected = overlay.__group.jobs.some(function (job) { return job.id === state.selectedId; });
+      var selected = state.mapFocusedRegion === overlay.__group.name ||
+        overlay.__group.jobs.some(function (job) { return job.id === state.selectedId; });
       $(overlay.getContent()).toggleClass("is-selected", selected);
       overlay.setZIndex(selected ? 10 : 2);
     });
@@ -747,6 +749,30 @@
       .appendTo("#mapMarkers");
   }
 
+  /* 지역 배지에 묶인 모든 공고 좌표를 감싸는 반투명 범위 표시 */
+  function showRegionArea(group) {
+    clearHoverArea();
+    if (!useKakao || !group || !group.coordCount) return;
+
+    var radius = 1200;
+    group.jobs.forEach(function (job) {
+      if (job.lat == null || job.lng == null) return;
+      var distanceM = haversineKm(group.lat, group.lng, job.lat, job.lng) * 1000;
+      radius = Math.max(radius, distanceM + 500);
+    });
+
+    hoverCircle = new kakao.maps.Circle({
+      map: kakaoMap,
+      center: new kakao.maps.LatLng(group.lat, group.lng),
+      radius: radius,
+      strokeWeight: 2,
+      strokeColor: "#2563eb",
+      strokeOpacity: 0.75,
+      fillColor: "#3b82f6",
+      fillOpacity: 0.14
+    });
+  }
+
   /* ---------- 렌더링: 지도 위 선택 미니 카드 ---------- */
   function renderMapSelected() {
     var $box = $("#mapSelected");
@@ -771,15 +797,24 @@
   }
 
   function jobsForList(visibleJobs) {
-    if (state.mapFocusedId == null) return visibleJobs;
-    var focused = visibleJobs.filter(function (job) { return job.id === state.mapFocusedId; });
-    if (focused.length) return focused;
-    state.mapFocusedId = null;
+    if (state.mapFocusedId != null) {
+      var focused = visibleJobs.filter(function (job) { return job.id === state.mapFocusedId; });
+      if (focused.length) return focused;
+      state.mapFocusedId = null;
+    }
+    if (state.mapFocusedRegion != null) {
+      var regionJobs = visibleJobs.filter(function (job) {
+        return regionName(job.region) === state.mapFocusedRegion;
+      });
+      if (regionJobs.length) return regionJobs;
+      state.mapFocusedRegion = null;
+    }
     return visibleJobs;
   }
 
   // 새 조건/뷰로 전체 리렌더 — 목록은 맨 위부터(renderLimit 초기화), 마커는 전부(뷰 내).
   function renderAll() {
+    clearHoverArea();
     renderLimit = RENDER_STEP;
     var visibleJobs = getVisibleJobs();
     renderFilterBar();
@@ -791,7 +826,16 @@
   function focusJobFromMap(job) {
     clearHoverArea();
     state.mapFocusedId = job.id;
+    state.mapFocusedRegion = null;
     state.selectedId = job.id;
+    renderAll();
+  }
+
+  function focusRegionFromMap(group) {
+    clearHoverArea();
+    state.mapFocusedId = null;
+    state.mapFocusedRegion = group.name;
+    state.selectedId = null;
     renderAll();
   }
 
