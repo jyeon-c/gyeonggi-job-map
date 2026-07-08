@@ -8,7 +8,7 @@
 |---|---|---|---|
 | 1 | 반응형 팝업·분양처 브랜딩 | `frontend/embed.js`, `embed-demo.html`, URL `brand/logo/src` | 완료 |
 | 2 | 공공/민간 지도 구분·상세·지도 갱신 | `frontend/js/app.js` 마커/지역집계/선택 상태 | 완료 |
-| 3 | PC IP·모바일 GPS 기본 위치·동의 | `/api/location` Cloudflare 위치 헤더, Geolocation 폴백, 최초 동의 UI | 완료(Cloudflare 위치 헤더 활성화 필요) |
+| 3 | PC IP·모바일 GPS 기본 위치·동의 | `/api/location` Cloudflare 위치 헤더, Geolocation 폴백, 최초 동의 UI | 조건부 통과: 코드/폴백 정상, 운영 헤더 활성화 필요 |
 | 4 | 현재 위치·주변 공고·오차 안내 | 다중 위치 측정, 3km 초과 취소, 거리순 목록 | 완료 |
 | 5 | 주소/장소 검색·최근검색 | 카카오 Geocoder/Places, localStorage 최근검색 | 완료 |
 | 6 | 지도 범위 목록·카드·지원·정렬 | 목록 카드, 원문 URL, 마감/거리 정렬 | 완료 |
