@@ -14,6 +14,12 @@
                    "jobKorea":  433,
                    "total":  460
                },
+    "jobKoreaAddressJoin":  {
+                                "activeAfterDedup":  433,
+                                "matchedByBizNo":  105,
+                                "addressGeocoded":  0,
+                                "fallbackToAreaInfo":  433
+                            },
     "coordinates":  {
                         "manualOverride":  0,
                         "companySample":  0,

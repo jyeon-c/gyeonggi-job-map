@@ -3,9 +3,10 @@
 #
 # data/데이터_안내.md 의 좌표 처리 방침 구현:
 #   1) 고용24: BASIC_ADDR + DETAIL_ADDR(근무지 상세 주소) → 지오코딩 대상
-#   2) 잡코리아: 상세 근무지 주소가 없으므로 AREA_INFO 시군 중심점 근사
-#   3) 기업좌표_샘플 / 기업주소_사업자번호는 기업·본사 위치일 수 있어 공고 근무지 좌표로 쓰지 않음
-#   4) KAKAO_REST_API_KEY가 있으면 고용24 상세주소를 지오코딩하고, 없으면 시군 중심점 근사
+#   2) 잡코리아: BIZ_NO ↔ 기업주소_사업자번호.BIZRNO 조인으로 주소 보완 후 지오코딩
+#   3) 잡코리아 주소 조인/지오코딩 실패 시 AREA_INFO 시군 중심점 근사
+#   4) 기업좌표_샘플은 좌표 보조·검증용이며 공고 위치의 1차 기준으로 쓰지 않음
+#   5) KAKAO_REST_API_KEY가 있으면 상세주소를 지오코딩하고, 없으면 시군 중심점 근사
 #
 # 산출물:
 #   - data/processed/jobs.json        (통합 정제 데이터, ERD job_posting 필드 기준)
@@ -57,6 +58,39 @@ function Add-CodeMap($target, $rows, [string]$groupCode) {
             $target[$row.CMN_CD.Trim()] = $row.CMN_NM.Trim()
         }
     }
+}
+
+function Import-StrictCsv([string]$path, [int]$expectedColumns = 0) {
+    $rows = @(Import-Csv -LiteralPath $path -Encoding UTF8)
+    if ($rows.Count -eq 0) { return $rows }
+    $columns = @($rows[0].PSObject.Properties.Name)
+    if ($expectedColumns -gt 0 -and $columns.Count -ne $expectedColumns) {
+        throw "CSV 컬럼 수 불일치: $path expected=$expectedColumns actual=$($columns.Count)"
+    }
+    foreach ($r in $rows) {
+        if (@($r.PSObject.Properties.Name).Count -ne $columns.Count) {
+            throw "CSV 행 컬럼 수 불일치: $path"
+        }
+    }
+    return $rows
+}
+
+function Build-CompanyAddressMap($rows) {
+    $map = @{}
+    foreach ($row in $rows) {
+        $bizNo = Normalize-BizNo $row.BIZRNO
+        if (-not $bizNo -or $map.ContainsKey($bizNo)) { continue }
+        $base = if ($row.HDQTR_KOR_ADRS) { $row.HDQTR_KOR_ADRS.Trim() } else { "" }
+        $detail = if ($row.HDQTR_KOR_DETAIL_ADRS) { $row.HDQTR_KOR_DETAIL_ADRS.Trim() } else { "" }
+        $address = ("{0} {1}" -f $base, $detail).Trim()
+        if (-not $address) { continue }
+        $map[$bizNo] = [PSCustomObject]@{
+            bizNo = $bizNo
+            company = $row.ENT_NM
+            address = $address
+        }
+    }
+    return $map
 }
 
 function Map-Career([string]$v) {
@@ -192,13 +226,16 @@ function Get-KakaoCoord([string]$addr) {
 
 # ---------- 데이터 로드 ----------
 Write-Host "CSV 로드 중..."
-$gy24 = Import-Csv (Join-Path $dataDir "채용공고_고용24.csv") -Encoding UTF8
-$jk   = Import-Csv (Join-Path $dataDir "채용공고_잡코리아.csv") -Encoding UTF8
-$careerCodes = Import-Csv (Join-Path $dataDir "공통코드_경력.csv") -Encoding UTF8
-$educationCodes = Import-Csv (Join-Path $dataDir "공통코드_학력.csv") -Encoding UTF8
-$employmentCodes = Import-Csv (Join-Path $dataDir "공통코드_고용형태.csv") -Encoding UTF8
-$companyJobCodes = Import-Csv (Join-Path $dataDir "공통코드_기업채용.csv") -Encoding UTF8
-$worknetJobCodes = Import-Csv (Join-Path $dataDir "직종분류\직종분류_03_고용24_워크넷.csv") -Encoding UTF8
+$gy24 = Import-StrictCsv (Join-Path $dataDir "채용공고_고용24.csv") 46
+$jk   = Import-StrictCsv (Join-Path $dataDir "채용공고_잡코리아.csv") 50
+$careerCodes = Import-StrictCsv (Join-Path $dataDir "공통코드_경력.csv") 16
+$educationCodes = Import-StrictCsv (Join-Path $dataDir "공통코드_학력.csv") 16
+$employmentCodes = Import-StrictCsv (Join-Path $dataDir "공통코드_고용형태.csv") 16
+$companyJobCodes = Import-StrictCsv (Join-Path $dataDir "공통코드_기업채용.csv") 16
+$worknetJobCodes = Import-StrictCsv (Join-Path $dataDir "직종분류\직종분류_03_고용24_워크넷.csv") 16
+$jobKoreaJobCodes = Import-StrictCsv (Join-Path $dataDir "직종분류\직종분류_04_잡코리아.csv") 16
+$companyAddresses = Import-StrictCsv (Join-Path $dataDir "기업주소_사업자번호.csv") 6
+$companyAddressMap = Build-CompanyAddressMap $companyAddresses
 
 $gy24RawCount = $gy24.Count
 $jkRawCount = $jk.Count
@@ -218,6 +255,12 @@ $worknetJobMap = @{}
 foreach ($row in $worknetJobCodes) {
     if ($row.USE_YN -eq "Y" -and $row.DEL_YN -eq "N") {
         $worknetJobMap[$row.CMN_CD.Trim().PadLeft(6, "0")] = $row.CMN_NM.Trim()
+    }
+}
+$jobKoreaJobMap = @{}
+foreach ($row in $jobKoreaJobCodes) {
+    if ($row.USE_YN -eq "Y" -and $row.DEL_YN -eq "N") {
+        $jobKoreaJobMap[$row.CMN_CD.Trim()] = $row.CMN_NM.Trim()
     }
 }
 
@@ -242,6 +285,7 @@ $duplicateCount = $jkActiveCount - $jk.Count
 $jobs = New-Object System.Collections.Generic.List[object]
 $seq = 0
 $manualCoordCount = 0; $companyCoordCount = 0; $geocodedCount = 0; $approxCoordCount = 0
+$jobKoreaAddressMatchedCount = 0; $jobKoreaAddressGeocodedCount = 0
 $gyJobCodeFallback = 0; $jkJobCodeFallback = 0
 
 # --- 고용24 (공공): 경기 지역만 ---
@@ -295,16 +339,31 @@ foreach ($r in $gy24) {
 }
 $gy24Count = $seq
 
-# --- 잡코리아 (민간): 상세 근무지 주소 미제공 → AREA_INFO 근사 ---
+# --- 잡코리아 (민간): BIZ_NO로 기업주소 보완 후 지오코딩, 실패 시 AREA_INFO 근사 ---
 foreach ($r in $jk) {
     $seq++
     $bizNo = Normalize-BizNo $r.BIZ_NO
 
-    # 잡코리아 원본은 상세 근무지 주소가 없어 AREA_INFO가 기본 위치 기준이다.
+    $matchedAddress = $null
+    if ($bizNo -and $companyAddressMap.ContainsKey($bizNo)) {
+        $matchedAddress = $companyAddressMap[$bizNo].address
+        $jobKoreaAddressMatchedCount++
+    }
+
     $coord = $null; $precision = $null
-    $coord = Get-ApproxCoord $r.AREA_INFO $seq
-    $precision = if ($coord) { "region_approx" } else { $null }
-    if ($coord) { $approxCoordCount++ }
+    if ($matchedAddress) {
+        $coord = Get-KakaoCoord $matchedAddress
+        if ($coord) {
+            $precision = "company_address"
+            $geocodedCount++
+            $jobKoreaAddressGeocodedCount++
+        }
+    }
+    if (-not $coord) {
+        $coord = Get-ApproxCoord $r.AREA_INFO $seq
+        $precision = if ($coord) { "region_approx" } else { $null }
+        if ($coord) { $approxCoordCount++ }
+    }
 
     $salary = $r.PAY_INFO.Trim()
     if ($r.PAY_TERM_INFO) { $salary = "$salary $($r.PAY_TERM_INFO.Trim())" }
@@ -312,7 +371,8 @@ foreach ($r in $jk) {
     $educationName = if ($jkEducationMap.ContainsKey($r.GI_EDU_CUTLINE_CD)) { $jkEducationMap[$r.GI_EDU_CUTLINE_CD] } else { $r.EDU_CUTLINE_INFO }
     $employmentCode = (($r.GI_JOB_TYPE_CD -split ",")[0].TrimStart("0"))
     $employmentName = if ($jkEmploymentMap.ContainsKey($employmentCode)) { $jkEmploymentMap[$employmentCode] } else { $r.JOB_TYPE_INFO }
-    if ($commonJobMap.ContainsKey($r.CL_CD)) { $jobName = $commonJobMap[$r.CL_CD] }
+    if ($jobKoreaJobMap.ContainsKey($r.CL_CD)) { $jobName = $jobKoreaJobMap[$r.CL_CD] }
+    elseif ($commonJobMap.ContainsKey($r.CL_CD)) { $jobName = $commonJobMap[$r.CL_CD] }
     else { $jobName = $r.PART_NO_INFO; $jkJobCodeFallback++ }
 
     $jobs.Add([PSCustomObject]@{
@@ -321,7 +381,7 @@ foreach ($r in $jk) {
         title = $r.GI_SUBJECT.Trim(); company = $r.COM_NAME.Trim()
         bizNo = $bizNo
         region = $r.AREA_INFO.Trim()
-        addressRaw = $r.AREA_INFO.Trim()
+        addressRaw = if ($matchedAddress) { $matchedAddress } else { $r.AREA_INFO.Trim() }
         career = Map-Career $careerName; careerRaw = $r.CAREER_INFO
         education = Map-Education $educationName; educationRaw = $r.EDU_CUTLINE_INFO
         empType = Map-EmpType-JobKorea $employmentName
@@ -380,6 +440,12 @@ $qualityReport = [ordered]@{
     input = [ordered]@{ work24 = $gy24RawCount; jobKorea = $jkRawCount; total = $gy24RawCount + $jkRawCount }
     excluded = [ordered]@{ deletedOrInactive = $inactiveCount; nonGyeonggiWork24 = $gy24.Count - $gy24Count; duplicateJobKorea = $duplicateCount }
     output = [ordered]@{ work24 = $gy24Count; jobKorea = $jk.Count; total = $jobs.Count }
+    jobKoreaAddressJoin = [ordered]@{
+        activeAfterDedup = $jk.Count
+        matchedByBizNo = $jobKoreaAddressMatchedCount
+        addressGeocoded = $jobKoreaAddressGeocodedCount
+        fallbackToAreaInfo = $jk.Count - $jobKoreaAddressGeocodedCount
+    }
     coordinates = [ordered]@{ manualOverride = $manualCoordCount; companySample = $companyCoordCount; addressGeocoded = $geocodedCount; regionApprox = $approxCoordCount; missing = $noCoord }
     mappingFallbacks = [ordered]@{ work24JobCategory = $gyJobCodeFallback; jobKoreaJobCategory = $jkJobCodeFallback }
     optionalMissing = [ordered]@{
@@ -402,6 +468,7 @@ Write-Host "=== 빌드 완료 ==="
 Write-Host "총 $($jobs.Count)건 (고용24/경기 $gy24Count + 잡코리아 $($jk.Count))"
 Write-Host "삭제/비활성 제외: $inactiveCount 건 (고용24+잡코리아 원본 기준)"
 Write-Host "잡코리아 중복 제거: ${duplicateCount}건 (활성 $jkActiveCount → $($jk.Count))"
+Write-Host "잡코리아 사업자번호 주소 매칭: $jobKoreaAddressMatchedCount/$($jk.Count), 주소 지오코딩: $jobKoreaAddressGeocodedCount/$jobKoreaAddressMatchedCount"
 Write-Host "잡코리아 수동 정확 위치: $manualCoordCount/$($jk.Count)"
 Write-Host "좌표: exact $exact / region_approx $approx / 없음 $noCoord"
 Write-Host "좌표 출처: MAP_COOR_X/Y $companyCoordCount / 수동검증 $manualCoordCount / 주소지오코딩 $geocodedCount / 지역근사 $approxCoordCount"
