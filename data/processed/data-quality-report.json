@@ -17,14 +17,16 @@
     "jobKoreaAddressJoin":  {
                                 "activeAfterDedup":  433,
                                 "matchedByBizNo":  105,
-                                "addressGeocoded":  0,
-                                "fallbackToAreaInfo":  433
+                                "addressGeocoded":  97,
+                                "fallbackToAreaInfo":  336
                             },
     "coordinates":  {
+                        "exact":  25,
+                        "companyAddress":  97,
+                        "regionApprox":  338,
                         "manualOverride":  0,
                         "companySample":  0,
-                        "addressGeocoded":  0,
-                        "regionApprox":  460,
+                        "addressGeocoded":  122,
                         "missing":  0
                     },
     "mappingFallbacks":  {

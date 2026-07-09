@@ -891,7 +891,7 @@
       hoverAreas.push(new kakao.maps.Circle({
         map: kakaoMap,
         center: new kakao.maps.LatLng(job.lat, job.lng),
-        radius: job.geocodePrecision === "exact" ? 700 : 2200,
+        radius: job.geocodePrecision === "region_approx" ? 2200 : 700,
         strokeWeight: 2,
         strokeColor: "#2563eb",
         strokeOpacity: 0.75,
@@ -948,7 +948,12 @@
     var job = jobsById[state.selectedId];
     if (!job) { $box.prop("hidden", true).empty(); return; }
 
-    var approx = job.geocodePrecision === "region_approx" ? ' · <em>위치 근사</em>' : '';
+    var precisionLabel = "";
+    if (job.geocodePrecision === "region_approx") {
+      precisionLabel = ' · <em>위치 근사</em>';
+    } else if (job.geocodePrecision === "company_address") {
+      precisionLabel = ' · <em>기업주소 기준</em>';
+    }
     var linkUrl = sourceUrl(job);
     var link = linkUrl
       ? '<a class="map-selected__link" href="' + esc(linkUrl) + '" data-job-id="' + job.id +
@@ -958,7 +963,7 @@
       '<button type="button" class="map-selected__close" aria-label="닫기">×</button>' +
       '<p class="map-selected__title">' + esc(job.title) + '</p>' +
       '<p class="map-selected__info">' + esc(job.company) + ' · ' + esc(regionShort(job.region)) +
-        ' · ' + esc(job.salary) + ' · ' + ddayLabel(ddayOf(job)) + approx + '</p>' +
+        ' · ' + esc(job.salary) + ' · ' + ddayLabel(ddayOf(job)) + precisionLabel + '</p>' +
       link
     );
   }

@@ -12,7 +12,7 @@
 | biz_no | VARCHAR | 사업자번호(숫자만, 하이픈 제거) |
 | address_raw | VARCHAR | 원본 주소/지역명 |
 | lat / lng | DOUBLE | WGS84 위도·경도 |
-| geocode_precision | VARCHAR | 'exact' / 'region_approx' |
+| geocode_precision | VARCHAR | 'exact' / 'company_address' / 'region_approx' |
 | career_code | VARCHAR | 공통코드_경력 FK |
 | edu_code | VARCHAR | 공통코드_학력 FK |
 | employment_type_code | VARCHAR | 공통코드_고용형태 FK |
