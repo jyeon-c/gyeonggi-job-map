@@ -114,10 +114,27 @@
   var RENDER_STEP = 30;    // #9 무한스크롤 1회 렌더 개수
   var renderLimit = RENDER_STEP; // 현재 목록에 렌더된 개수
 
-  // 실행 시점의 로컬 날짜를 사용한다. 날짜를 고정하면 배포 후에도 지난 공고가
+  // 실행 시점의 Asia/Seoul 현재일을 사용한다. 날짜를 고정하면 배포 후에도 지난 공고가
   // 진행 중으로 남아 "마감 공고 미표시" 필터가 시간이 지날수록 틀어진다.
-  var now = new Date();
-  var TODAY = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  function serviceToday() {
+    var parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date());
+    var values = {};
+    parts.forEach(function (p) { if (p.type !== "literal") values[p.type] = p.value; });
+    return new Date(+values.year, +values.month - 1, +values.day);
+  }
+
+  var TODAY = serviceToday();
+
+  function formatDateYmd(date) {
+    var m = String(date.getMonth() + 1).padStart(2, "0");
+    var d = String(date.getDate()).padStart(2, "0");
+    return date.getFullYear() + "-" + m + "-" + d;
+  }
 
   /* 두 좌표 간 거리(km) — 하버사인 (#6 거리 표시/정렬) */
   function haversineKm(lat1, lng1, lat2, lng2) {
@@ -143,7 +160,9 @@
   /* ---------- 유틸 ---------- */
   function ddayOf(job) {
     if (!job.deadline) return null; // 상시채용
-    return Math.ceil((new Date(job.deadline) - TODAY) / 86400000);
+    var p = job.deadline.split("-");
+    var deadline = new Date(+p[0], +p[1] - 1, +p[2]);
+    return Math.ceil((deadline - TODAY) / 86400000);
   }
 
   function ddayLabel(diff) {
@@ -1231,6 +1250,7 @@
   /* ---------- 초기화 ---------- */
   $(function () {
     applyBranding();   // 위젯 임베드 분양처 브랜딩 먼저 적용
+    $("#deadlineBaseDate").text(formatDateYmd(TODAY));
     bindEvents();
     renderFilterBar(); // 필터 칩은 데이터와 무관하게 먼저 그려둔다
     loadMunicipalities().then(function () {

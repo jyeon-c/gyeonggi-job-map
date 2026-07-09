@@ -343,11 +343,25 @@ body.has-brand .content { padding-top: calc(var(--header-h) + var(--filterbar-h)
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px 10px;
+  gap: 12px;
 }
+
+.list-head__summary { min-width: 0; }
 
 .list-head__count { font-size: 14px; color: var(--text-body); }
 
 .list-head__count strong { color: var(--primary); font-weight: 800; }
+
+.list-head__date {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.list-head__date strong {
+  color: var(--text-body);
+  font-weight: 700;
+}
 
 .list-head__sort {
   border: 1px solid var(--line);
