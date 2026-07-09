@@ -13,6 +13,8 @@ jobmap:
   admin:
     username: ${ADMIN_USERNAME:admin}
     password: ${ADMIN_PASSWORD:admin1234}
+  seed:
+    replace: true
 
 ---
 # ===== local: H2 인메모리 + jobs.json 자동 적재 =====
@@ -50,3 +52,7 @@ spring:
       # 실습 단계: 스키마 자동 생성/보정. 운영 안정화 시 Flyway 마이그레이션으로 전환 권장.
       ddl-auto: update
     open-in-view: false
+
+jobmap:
+  seed:
+    replace: ${JOBMAP_SEED_REPLACE:false}

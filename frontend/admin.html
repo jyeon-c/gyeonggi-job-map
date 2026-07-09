@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>경기도 일자리맵 — 관리자 통계</title>
   <link rel="stylesheet" href="css/style.css?v=20260709-1">
-  <link rel="stylesheet" href="css/admin.css?v=20260709-1">
+  <link rel="stylesheet" href="css/admin.css?v=20260709-3">
 </head>
 <body class="admin">
 
@@ -66,6 +66,41 @@
         </div>
       </div>
       <div class="admin-grid" id="statsGrid"></div>
+
+      <section class="job-admin">
+        <div class="job-admin__head">
+          <div>
+            <h2>채용공고 관리</h2>
+            <p>운영 DB의 채용공고를 등록·수정·삭제합니다.</p>
+          </div>
+          <button type="button" class="job-admin__primary" id="jobCreateBtn">공고 등록</button>
+        </div>
+        <form class="job-admin__search" id="jobSearchForm">
+          <input type="search" id="jobSearchInput" placeholder="제목·회사·지역 검색">
+          <button type="submit">검색</button>
+        </form>
+        <div class="job-admin__table-wrap">
+          <table class="job-admin__table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>출처</th>
+                <th>제목</th>
+                <th>회사</th>
+                <th>지역</th>
+                <th>마감</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody id="jobAdminRows"></tbody>
+          </table>
+        </div>
+        <div class="job-admin__pager">
+          <button type="button" id="jobPrevBtn">이전</button>
+          <span id="jobPageInfo">–</span>
+          <button type="button" id="jobNextBtn">다음</button>
+        </div>
+      </section>
     </div>
 
     <div class="admin-state" id="adminState" hidden>불러오는 중…</div>
@@ -73,6 +108,63 @@
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="js/config.js"></script>
-  <script src="js/admin.js?v=20260709-1"></script>
+  <div class="admin-modal" id="jobFormModal" hidden>
+    <form class="admin-modal__box" id="jobForm">
+      <div class="admin-modal__head">
+        <h2 id="jobFormTitle">채용공고 등록</h2>
+        <button type="button" id="jobFormClose" aria-label="닫기">×</button>
+      </div>
+      <input type="hidden" id="jobId">
+      <div class="admin-form-grid">
+        <label>출처
+          <select id="jobSource" required>
+            <option value="private">잡코리아</option>
+            <option value="public">고용24</option>
+          </select>
+        </label>
+        <label>회사명<input id="jobCompany" required></label>
+        <label class="admin-form-grid--wide">제목<input id="jobTitleInput" required></label>
+        <label>지역<input id="jobRegion" required></label>
+        <label>주소/지역 원문<input id="jobAddressRaw" required></label>
+        <label>경력
+          <select id="jobCareer">
+            <option>무관</option><option>신입</option><option>경력</option>
+          </select>
+        </label>
+        <label>학력
+          <select id="jobEducation">
+            <option>무관</option><option>고졸 이상</option><option>대졸 이상</option>
+          </select>
+        </label>
+        <label>고용형태
+          <select id="jobEmpType">
+            <option>정규직</option><option>계약직</option><option>파트타임</option>
+          </select>
+        </label>
+        <label>직종<input id="jobCategory" value="기타"></label>
+        <label>임금<input id="jobSalary" value="회사 내규에 따름"></label>
+        <label>최소연봉(만원)<input id="jobSalaryMin" type="number" min="0"></label>
+        <label>등록일<input id="jobPostedAt" type="date"></label>
+        <label>마감일<input id="jobDeadline" type="date"></label>
+        <label>위도<input id="jobLat" type="number" step="0.000001" required></label>
+        <label>경도<input id="jobLng" type="number" step="0.000001" required></label>
+        <label>좌표정확도
+          <select id="jobGeocodePrecision">
+            <option value="region_approx">지역 근사</option>
+            <option value="exact">정확</option>
+          </select>
+        </label>
+        <label>사업자번호<input id="jobBizNo" maxlength="10"></label>
+        <label class="admin-form-grid--wide">원문 URL<input id="jobUrl" type="url" required></label>
+      </div>
+      <p class="admin-modal__error" id="jobFormError" hidden></p>
+      <div class="admin-modal__actions">
+        <button type="button" id="jobFormCancel">취소</button>
+        <button type="submit">저장</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="js/admin.js?v=20260709-3"></script>
 </body>
 </html>

@@ -9,6 +9,7 @@
     ? APP_CONFIG.apiBase : "";
 
   var AUTH_KEY = "jobmap_admin_auth"; // sessionStorage 에 저장하는 Basic 자격증명(base64)
+  var jobState = { page: 0, size: 10, keyword: "", rows: [], totalPages: 0, totalElements: 0 };
 
   function getAuth() {
     try { return sessionStorage.getItem(AUTH_KEY); } catch (e) { return null; }
@@ -58,6 +59,166 @@
     if (key === "고용24") return "bar-row__fill--public";
     if (key === "잡코리아") return "bar-row__fill--private";
     return "";
+  }
+
+  function authHeaders(auth) {
+    var token = auth || getAuth();
+    return token ? { Authorization: "Basic " + token } : {};
+  }
+
+  function todayYmd() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function sourceNameOf(source) {
+    return source === "public" ? "고용24" : source === "private" ? "잡코리아" : "관리자";
+  }
+
+  function loadAdminJobs(auth) {
+    var qs = new URLSearchParams({
+      page: jobState.page,
+      size: jobState.size
+    });
+    if (jobState.keyword) qs.set("keyword", jobState.keyword);
+
+    return fetch(API_BASE + "/api/admin/jobs?" + qs.toString(), { headers: authHeaders(auth) })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (page) {
+        jobState.rows = page.content || [];
+        jobState.totalPages = page.totalPages || 0;
+        jobState.totalElements = page.totalElements || 0;
+        renderAdminJobs();
+      });
+  }
+
+  function renderAdminJobs() {
+    var rows = jobState.rows.map(function (j) {
+      return (
+        '<tr>' +
+          '<td>' + j.id + '</td>' +
+          '<td>' + esc(j.sourceName || "") + '</td>' +
+          '<td class="is-title">' + esc(j.title || "") + '</td>' +
+          '<td>' + esc(j.company || "") + '</td>' +
+          '<td>' + esc(j.region || "") + '</td>' +
+          '<td>' + esc(j.deadline || "상시") + '</td>' +
+          '<td class="is-actions">' +
+            '<button type="button" data-action="edit" data-id="' + j.id + '">수정</button> ' +
+            '<button type="button" class="is-danger" data-action="delete" data-id="' + j.id + '">삭제</button>' +
+          '</td>' +
+        '</tr>'
+      );
+    }).join("");
+    $("#jobAdminRows").html(rows || '<tr><td colspan="7">조회된 공고가 없습니다.</td></tr>');
+    $("#jobPageInfo").text((jobState.page + 1) + " / " + Math.max(jobState.totalPages, 1) +
+      " · 총 " + jobState.totalElements.toLocaleString() + "건");
+    $("#jobPrevBtn").prop("disabled", jobState.page <= 0);
+    $("#jobNextBtn").prop("disabled", jobState.page + 1 >= jobState.totalPages);
+  }
+
+  function jobById(id) {
+    id = Number(id);
+    return jobState.rows.filter(function (j) { return j.id === id; })[0];
+  }
+
+  function openJobForm(job) {
+    $("#jobFormError").prop("hidden", true).text("");
+    $("#jobFormTitle").text(job ? "채용공고 수정" : "채용공고 등록");
+    $("#jobId").val(job ? job.id : "");
+    $("#jobSource").val(job ? job.source : "private");
+    $("#jobCompany").val(job ? job.company : "");
+    $("#jobTitleInput").val(job ? job.title : "");
+    $("#jobRegion").val(job ? job.region : "");
+    $("#jobAddressRaw").val(job ? job.addressRaw : "");
+    $("#jobCareer").val(job ? job.career : "무관");
+    $("#jobEducation").val(job ? job.education : "무관");
+    $("#jobEmpType").val(job ? job.empType : "정규직");
+    $("#jobCategory").val(job ? job.jobCategory : "기타");
+    $("#jobSalary").val(job ? job.salary : "회사 내규에 따름");
+    $("#jobSalaryMin").val(job && job.salaryMin != null ? job.salaryMin : "");
+    $("#jobPostedAt").val(job && job.postedAt ? job.postedAt : todayYmd());
+    $("#jobDeadline").val(job && job.deadline ? job.deadline : "");
+    $("#jobLat").val(job && job.lat != null ? job.lat : "37.2749");
+    $("#jobLng").val(job && job.lng != null ? job.lng : "127.0096");
+    $("#jobGeocodePrecision").val(job ? job.geocodePrecision : "region_approx");
+    $("#jobBizNo").val(job && job.bizNo ? job.bizNo : "");
+    $("#jobUrl").val(job ? job.url : "");
+    $("#jobFormModal").prop("hidden", false);
+  }
+
+  function closeJobForm() {
+    $("#jobFormModal").prop("hidden", true);
+  }
+
+  function nullableNumber(v) {
+    return v === "" ? null : Number(v);
+  }
+
+  function collectJobPayload() {
+    var source = $("#jobSource").val();
+    var career = $("#jobCareer").val();
+    var education = $("#jobEducation").val();
+    return {
+      source: source,
+      sourceName: sourceNameOf(source),
+      title: $("#jobTitleInput").val().trim(),
+      company: $("#jobCompany").val().trim(),
+      bizNo: $("#jobBizNo").val().trim() || null,
+      region: $("#jobRegion").val().trim(),
+      addressRaw: $("#jobAddressRaw").val().trim(),
+      career: career,
+      careerRaw: career,
+      education: education,
+      educationRaw: education,
+      empType: $("#jobEmpType").val(),
+      jobCategory: $("#jobCategory").val().trim() || "기타",
+      salary: $("#jobSalary").val().trim() || "회사 내규에 따름",
+      salaryMin: nullableNumber($("#jobSalaryMin").val()),
+      postedAt: $("#jobPostedAt").val() || null,
+      deadline: $("#jobDeadline").val() || null,
+      url: $("#jobUrl").val().trim(),
+      lat: Number($("#jobLat").val()),
+      lng: Number($("#jobLng").val()),
+      geocodePrecision: $("#jobGeocodePrecision").val()
+    };
+  }
+
+  function saveJob() {
+    var id = $("#jobId").val();
+    var isEdit = !!id;
+    return fetch(API_BASE + "/api/admin/jobs" + (isEdit ? "/" + id : ""), {
+      method: isEdit ? "PUT" : "POST",
+      headers: Object.assign({ "Content-Type": "application/json" }, authHeaders()),
+      body: JSON.stringify(collectJobPayload())
+    }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }).then(function () {
+      closeJobForm();
+      return loadStats(getAuth(), function () { showLogin(false); });
+    }).catch(function (err) {
+      $("#jobFormError").prop("hidden", false).text("저장에 실패했습니다. 필수값과 좌표/URL 형식을 확인해 주세요.");
+      if (window.console) console.error("[admin] 공고 저장 실패:", err);
+    });
+  }
+
+  function deleteJob(id) {
+    if (!confirm("이 채용공고를 삭제할까요?")) return;
+    fetch(API_BASE + "/api/admin/jobs/" + id, {
+      method: "DELETE",
+      headers: authHeaders()
+    }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return loadStats(getAuth(), function () { showLogin(false); });
+    }).catch(function (err) {
+      alert("삭제에 실패했습니다.");
+      if (window.console) console.error("[admin] 공고 삭제 실패:", err);
+    });
   }
 
   function render(stats) {
@@ -113,6 +274,7 @@
         return res.json();
       })
       .then(function (stats) { if (stats) render(stats); })
+      .then(function () { if (!$("#statsWrap").prop("hidden")) return loadAdminJobs(auth); })
       .catch(function (err) {
         if (window.console) console.error("[admin] 통계 조회 실패:", err);
         serverError();
@@ -142,6 +304,38 @@
     $("#logoutBtn").on("click", function () {
       setAuth(null);
       showLogin(false);
+    });
+
+    $("#jobSearchForm").on("submit", function (e) {
+      e.preventDefault();
+      jobState.keyword = $("#jobSearchInput").val().trim();
+      jobState.page = 0;
+      loadAdminJobs();
+    });
+
+    $("#jobCreateBtn").on("click", function () { openJobForm(null); });
+    $("#jobFormClose, #jobFormCancel").on("click", closeJobForm);
+    $("#jobForm").on("submit", function (e) {
+      e.preventDefault();
+      saveJob();
+    });
+    $("#jobPrevBtn").on("click", function () {
+      if (jobState.page > 0) {
+        jobState.page--;
+        loadAdminJobs();
+      }
+    });
+    $("#jobNextBtn").on("click", function () {
+      if (jobState.page + 1 < jobState.totalPages) {
+        jobState.page++;
+        loadAdminJobs();
+      }
+    });
+    $("#jobAdminRows").on("click", "button", function () {
+      var id = $(this).data("id");
+      var action = $(this).data("action");
+      if (action === "edit") openJobForm(jobById(id));
+      if (action === "delete") deleteJob(id);
     });
 
     // 초기: 저장된 자격증명이 있으면 조회, 없거나 만료면 로그인 화면

@@ -89,4 +89,7 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
 
   @Query("select count(j) from JobPosting j where j.deadline is not null and j.deadline < :today")
   long countExpiredAsOf(@Param("today") LocalDate today);
+
+  @Query("select coalesce(max(j.id), 0) + 1 from JobPosting j")
+  long nextId();
 }

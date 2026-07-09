@@ -10,7 +10,8 @@
 ```
 
 - 로컬은 `local` 프로필로 뜨며, 기동 시 `../data/processed/jobs.json`(파이프라인 산출물)을
-  H2 인메모리 DB에 자동 적재한다. 파일이 없으면 `scripts/build-jobs-data.ps1` 를 먼저 실행.
+  H2 인메모리 DB에 교체 적재한다. 파일이 없으면 `scripts/build-jobs-data.ps1` 를 먼저 실행.
+- 운영 `prod` 프로필은 관리자 CRUD 변경을 보존하기 위해 기본적으로 DB가 비어 있을 때만 시드를 적재한다.
 - 포트: `8080`. H2 콘솔: `http://localhost:8080/h2-console` (JDBC URL `jdbc:h2:mem:jobmap`).
 - 프런트(8087)에서의 호출을 위해 `local` 프로필에 CORS 허용(`LocalCorsConfig`)이 켜져 있다.
 
@@ -33,6 +34,7 @@
 | GET | `/api/jobs/nearby` | lat,lng,radiusKm 반경 검색(거리순) |
 | GET | `/api/jobs/{id}` | 상세 |
 | GET | `/api/codes/{group}` | career / education / employment-type / source |
+| GET/POST/PUT/DELETE | `/api/admin/jobs` | 관리자 채용공고 기본 CRUD(인증 필요) |
 
 ## 운영(prod) 전환 메모
 

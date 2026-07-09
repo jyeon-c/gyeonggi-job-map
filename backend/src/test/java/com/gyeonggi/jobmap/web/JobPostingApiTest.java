@@ -3,7 +3,11 @@ package com.gyeonggi.jobmap.web;
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -216,5 +221,59 @@ class JobPostingApiTest {
         // 경력: 무관 2, 경력 1
         .andExpect(jsonPath("$.byCareer[0].key").value("무관"))
         .andExpect(jsonPath("$.byCareer[0].count").value(2));
+  }
+
+  @Test
+  void 관리자_채용공고_CRUD() throws Exception {
+    String body = """
+        {
+          "source":"private",
+          "sourceName":"잡코리아",
+          "title":"관리자 등록 공고",
+          "company":"테스트회사",
+          "region":"수원시",
+          "addressRaw":"수원시",
+          "career":"무관",
+          "education":"무관",
+          "empType":"정규직",
+          "jobCategory":"기타",
+          "salary":"회사 내규에 따름",
+          "postedAt":"2026-07-09",
+          "deadline":"2026-08-01",
+          "url":"https://example.com/job",
+          "lat":37.2636,
+          "lng":127.0286,
+          "geocodePrecision":"region_approx"
+        }
+        """;
+
+    String created = mockMvc.perform(post("/api/admin/jobs")
+            .with(httpBasic("admin", "admin1234"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.title").value("관리자 등록 공고"))
+        .andReturn().getResponse().getContentAsString();
+
+    Long id = Long.valueOf(created.replaceAll(".*\"id\":(\\d+).*", "$1"));
+
+    mockMvc.perform(put("/api/admin/jobs/{id}", id)
+            .with(httpBasic("admin", "admin1234"))
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body.replace("관리자 등록 공고", "관리자 수정 공고")))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.title").value("관리자 수정 공고"));
+
+    mockMvc.perform(get("/api/admin/jobs").with(httpBasic("admin", "admin1234"))
+            .param("keyword", "관리자 수정"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(1));
+
+    mockMvc.perform(delete("/api/admin/jobs/{id}", id).with(httpBasic("admin", "admin1234")))
+        .andExpect(status().isNoContent())
+        .andExpect(content().string(""));
+
+    mockMvc.perform(get("/api/admin/jobs/{id}", id).with(httpBasic("admin", "admin1234")))
+        .andExpect(status().isNotFound());
   }
 }

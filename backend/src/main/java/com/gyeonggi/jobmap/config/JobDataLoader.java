@@ -22,8 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li>prod : PostgreSQL — 컨테이너에 담긴 {@code /app/data/jobs.json}
  *       (경로는 환경변수 {@code JOBMAP_DATA_FILE} 로 주입)</li>
  * </ul>
- * 파일을 배포 시드의 단일 기준으로 삼아 기동할 때마다 한 트랜잭션으로 교체한다.
- * 따라서 데이터 파이프라인에 필드가 추가되거나 값이 바뀌어도 운영 DB가 뒤처지지 않는다.
+ * 파일을 배포 시드의 단일 기준으로 삼아 local 에서는 기동할 때마다 한 트랜잭션으로 교체한다.
+ * prod 에서는 관리자 CRUD 변경을 보존하기 위해 기본적으로 DB가 비어 있을 때만 적재한다.
  * 테스트(test)에서는 각 테스트가 직접 시드하므로 비활성화한다.
  */
 @Slf4j
@@ -39,9 +39,18 @@ public class JobDataLoader implements CommandLineRunner {
   @Value("${jobmap.data-file:../data/processed/jobs.json}")
   private String dataFile;
 
+  @Value("${jobmap.seed.replace:true}")
+  private boolean replaceSeed;
+
   @Override
   @Transactional
   public void run(String... args) throws Exception {
+    long existing = repository.count();
+    if (!replaceSeed && existing > 0) {
+      log.info("채용공고 DB 기존 {}건 유지 — 시드 교체 생략 (jobmap.seed.replace=false)", existing);
+      return;
+    }
+
     Path path = Path.of(dataFile);
     if (!Files.exists(path)) {
       log.warn("데이터 파일이 없습니다: {} — scripts/build-jobs-data.ps1 실행 후 재기동하세요.", path.toAbsolutePath());
@@ -53,7 +62,9 @@ public class JobDataLoader implements CommandLineRunner {
         objectMapper.getTypeFactory().constructCollectionType(List.class, JobRecord.class));
 
     List<JobPosting> entities = records.stream().map(JobRecord::toEntity).toList();
-    repository.deleteAllInBatch();
+    if (replaceSeed) {
+      repository.deleteAllInBatch();
+    }
     repository.saveAll(entities);
     log.info("채용공고 {}건을 배포 시드로 갱신 완료 ({})", entities.size(), path.toAbsolutePath());
   }
