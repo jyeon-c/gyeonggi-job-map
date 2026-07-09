@@ -15,10 +15,10 @@
                    "total":  460
                },
     "coordinates":  {
-                        "manualOverride":  1,
-                        "companySample":  1,
+                        "manualOverride":  0,
+                        "companySample":  0,
                         "addressGeocoded":  0,
-                        "regionApprox":  458,
+                        "regionApprox":  460,
                         "missing":  0
                     },
     "mappingFallbacks":  {

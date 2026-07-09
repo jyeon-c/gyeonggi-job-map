@@ -2,11 +2,10 @@
 # 채용공고 CSV → 통합 데이터 빌드 파이프라인
 #
 # data/데이터_안내.md 의 좌표 처리 방침 구현:
-#   1) 고용24: BASIC_ADDR(자체 주소) → 지오코딩 대상 (경기 지역만 필터)
-#   2) 잡코리아: BIZ_NO ↔ 기업주소_사업자번호.csv BIZRNO 조인(숫자만, 10자리 패딩)
-#      → 주소 있으면 지오코딩 대상, 없으면 AREA_INFO 시군 중심점 근사
-#   3) 기업좌표_샘플은 BUSINO ↔ BIZ_NO가 일치하는 공고에 MAP_COOR_Y/X를 우선 적용
-#   4) KAKAO_REST_API_KEY가 있으면 나머지 상세주소를 지오코딩하고, 없으면 시군 중심점 근사
+#   1) 고용24: BASIC_ADDR + DETAIL_ADDR(근무지 상세 주소) → 지오코딩 대상
+#   2) 잡코리아: 상세 근무지 주소가 없으므로 AREA_INFO 시군 중심점 근사
+#   3) 기업좌표_샘플 / 기업주소_사업자번호는 기업·본사 위치일 수 있어 공고 근무지 좌표로 쓰지 않음
+#   4) KAKAO_REST_API_KEY가 있으면 고용24 상세주소를 지오코딩하고, 없으면 시군 중심점 근사
 #
 # 산출물:
 #   - data/processed/jobs.json        (통합 정제 데이터, ERD job_posting 필드 기준)
@@ -23,15 +22,6 @@ $outDir = Join-Path $root "data\processed"
 if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-
-# ---------- 공고별 수동 좌표 보강 ----------
-# 원본에 상세주소가 없지만 공식 지점 정보로 정확한 좌표를 확인한 공고에 우선 적용한다.
-$overridePath = Join-Path $dataDir "geocode-overrides.json"
-$coordOverrides = @{}
-if (Test-Path $overridePath) {
-    $overrideData = Get-Content $overridePath -Raw -Encoding UTF8 | ConvertFrom-Json
-    foreach ($p in $overrideData.PSObject.Properties) { $coordOverrides[$p.Name] = $p.Value }
-}
 
 # ---------- 경기도 시·군 중심점 좌표 (근사용) ----------
 $CENTROIDS = @{
@@ -148,7 +138,7 @@ function Parse-YmdDate([string]$v) {
     return $null
 }
 
-# 시군 중심점 + 결정적 지터(같은 시군 공고가 정확히 겹치지 않게, ±0.02도 ≈ 2km)
+# 시군 대표 좌표. 정확 주소가 없는 공고를 임의로 흩뿌리면 산/하천 등 엉뚱한 위치로 밀릴 수 있어 지터를 주지 않는다.
 # 복수 지역 표기("의정부시, 서울 강남구")는 콤마 분리 후 경기 시군이 나오는 첫 항목 사용
 $CITY_ALIAS = @{ "여주군" = "여주시" }
 function Get-ApproxCoord([string]$regionText, [int]$seed) {
@@ -162,10 +152,9 @@ function Get-ApproxCoord([string]$regionText, [int]$seed) {
     }
     if (-not $city) { return $null }
     $c = $CENTROIDS[$city]
-    $rand = New-Object System.Random($seed)
     return @{
-        lat = [Math]::Round($c[0] + ($rand.NextDouble() - 0.5) * 0.04, 6)
-        lng = [Math]::Round($c[1] + ($rand.NextDouble() - 0.5) * 0.05, 6)
+        lat = [Math]::Round($c[0], 6)
+        lng = [Math]::Round($c[1], 6)
     }
 }
 
@@ -205,8 +194,6 @@ function Get-KakaoCoord([string]$addr) {
 Write-Host "CSV 로드 중..."
 $gy24 = Import-Csv (Join-Path $dataDir "채용공고_고용24.csv") -Encoding UTF8
 $jk   = Import-Csv (Join-Path $dataDir "채용공고_잡코리아.csv") -Encoding UTF8
-$addrCsv = Import-Csv (Join-Path $dataDir "기업주소_사업자번호.csv") -Encoding UTF8
-$coordCsv = Import-Csv (Join-Path $dataDir "기업좌표_샘플.csv") -Encoding UTF8
 $careerCodes = Import-Csv (Join-Path $dataDir "공통코드_경력.csv") -Encoding UTF8
 $educationCodes = Import-Csv (Join-Path $dataDir "공통코드_학력.csv") -Encoding UTF8
 $employmentCodes = Import-Csv (Join-Path $dataDir "공통코드_고용형태.csv") -Encoding UTF8
@@ -251,27 +238,6 @@ $jk = @($jk | Where-Object {
 })
 $duplicateCount = $jkActiveCount - $jk.Count
 
-# 사업자번호 → 주소 조인 맵
-$addrMap = @{}
-foreach ($a in $addrCsv) {
-    $k = Normalize-BizNo $a.BIZRNO
-    if ($k -and -not $addrMap.ContainsKey($k) -and $a.HDQTR_KOR_ADRS) { $addrMap[$k] = $a }
-}
-
-# 제공된 기업 좌표가 채용공고 사업자번호와 일치하면 지역 중심점보다 우선한다.
-$companyCoordMap = @{}
-foreach ($c in $coordCsv) {
-    $k = Normalize-BizNo $c.BUSINO
-    if ($k -and -not $companyCoordMap.ContainsKey($k) -and $c.USE_YN -eq "Y" -and
-        $c.MAP_COOR_Y -and $c.MAP_COOR_X) {
-        $lat = [double]$c.MAP_COOR_Y; $lng = [double]$c.MAP_COOR_X
-        if ($lat -ge 33 -and $lat -le 39.5 -and $lng -ge 124 -and $lng -le 132) {
-            # 원본 데이터사전 정의: MAP_COOR_Y=위도(latitude), MAP_COOR_X=경도(longitude)
-            $companyCoordMap[$k] = @{ lat = $lat; lng = $lng }
-        }
-    }
-}
-
 # ---------- 통합 레코드 생성 ----------
 $jobs = New-Object System.Collections.Generic.List[object]
 $seq = 0
@@ -289,13 +255,10 @@ foreach ($r in $gy24) {
     if ($detail -and $detail -ne "." -and $detail -ne "null") { $addr = "$addr $detail" }
 
     $bizNo = Normalize-BizNo $r.BIZ_NO
-    $coord = if ($bizNo -and $companyCoordMap.ContainsKey($bizNo)) { $companyCoordMap[$bizNo] } else { $null }
+    $coord = $null
     $precision = "exact"
-    if ($coord) { $companyCoordCount++ }
-    if (-not $coord) {
-        $coord = Get-KakaoCoord $r.BASIC_ADDR
-        if ($coord) { $geocodedCount++ }
-    }
+    $coord = Get-KakaoCoord $addr
+    if ($coord) { $geocodedCount++ }
     if (-not $coord) {
         $coord = Get-ApproxCoord $region $seq
         $precision = "region_approx"
@@ -332,48 +295,16 @@ foreach ($r in $gy24) {
 }
 $gy24Count = $seq
 
-# --- 잡코리아 (민간): 전체 경기 ---
-$jkExactAddr = 0
+# --- 잡코리아 (민간): 상세 근무지 주소 미제공 → AREA_INFO 근사 ---
 foreach ($r in $jk) {
     $seq++
     $bizNo = Normalize-BizNo $r.BIZ_NO
 
-    $jobNo = $null
-    if ($r.JK_URL -match "/GI_Read/(\d+)") { $jobNo = $Matches[1] }
-    $overrideKey = if ($jobNo) { "jobkorea:$jobNo" } else { $null }
-    $override = if ($overrideKey -and $coordOverrides.ContainsKey($overrideKey)) {
-        $coordOverrides[$overrideKey]
-    } else { $null }
-
-    # 사업자번호 조인으로 정확 주소 확보 시도
-    $addr = $null
-    if ($override) {
-        $addr = $override.address
-    } elseif ($bizNo -and $addrMap.ContainsKey($bizNo)) {
-        $a = $addrMap[$bizNo]
-        $addr = $a.HDQTR_KOR_ADRS.Trim()
-        if ($a.HDQTR_KOR_DETAIL_ADRS) { $addr = "$addr $($a.HDQTR_KOR_DETAIL_ADRS.Trim())" }
-        $jkExactAddr++
-    }
-
+    # 잡코리아 원본은 상세 근무지 주소가 없어 AREA_INFO가 기본 위치 기준이다.
     $coord = $null; $precision = $null
-    if ($override) {
-        $coord = @{ lat = [double]$override.lat; lng = [double]$override.lng }
-        $precision = "exact"
-        $manualCoordCount++
-    } elseif ($bizNo -and $companyCoordMap.ContainsKey($bizNo)) {
-        $coord = $companyCoordMap[$bizNo]
-        $precision = "exact"
-        $companyCoordCount++
-    } elseif ($addr) {
-        $coord = Get-KakaoCoord $addr
-        if ($coord) { $precision = "exact"; $geocodedCount++ }
-    }
-    if (-not $coord) {
-        $coord = Get-ApproxCoord $r.AREA_INFO $seq
-        $precision = if ($coord) { "region_approx" } else { $null }
-        if ($coord) { $approxCoordCount++ }
-    }
+    $coord = Get-ApproxCoord $r.AREA_INFO $seq
+    $precision = if ($coord) { "region_approx" } else { $null }
+    if ($coord) { $approxCoordCount++ }
 
     $salary = $r.PAY_INFO.Trim()
     if ($r.PAY_TERM_INFO) { $salary = "$salary $($r.PAY_TERM_INFO.Trim())" }
@@ -390,7 +321,7 @@ foreach ($r in $jk) {
         title = $r.GI_SUBJECT.Trim(); company = $r.COM_NAME.Trim()
         bizNo = $bizNo
         region = $r.AREA_INFO.Trim()
-        addressRaw = if ($addr) { $addr } else { $r.AREA_INFO.Trim() }
+        addressRaw = $r.AREA_INFO.Trim()
         career = Map-Career $careerName; careerRaw = $r.CAREER_INFO
         education = Map-Education $educationName; educationRaw = $r.EDU_CUTLINE_INFO
         empType = Map-EmpType-JobKorea $employmentName
@@ -471,10 +402,10 @@ Write-Host "=== 빌드 완료 ==="
 Write-Host "총 $($jobs.Count)건 (고용24/경기 $gy24Count + 잡코리아 $($jk.Count))"
 Write-Host "삭제/비활성 제외: $inactiveCount 건 (고용24+잡코리아 원본 기준)"
 Write-Host "잡코리아 중복 제거: ${duplicateCount}건 (활성 $jkActiveCount → $($jk.Count))"
-Write-Host "잡코리아 정확 주소 확보: $jkExactAddr/$($jk.Count)"
+Write-Host "잡코리아 수동 정확 위치: $manualCoordCount/$($jk.Count)"
 Write-Host "좌표: exact $exact / region_approx $approx / 없음 $noCoord"
 Write-Host "좌표 출처: MAP_COOR_X/Y $companyCoordCount / 수동검증 $manualCoordCount / 주소지오코딩 $geocodedCount / 지역근사 $approxCoordCount"
 Write-Host "품질 검증: ID·공고·URL중복 0 / 필수결측 0 / 좌표·날짜·코드형식오류 0"
-if (-not $kakaoKey) { Write-Host "※ KAKAO_REST_API_KEY 미설정 → 제공·수동 좌표 외에는 시군 중심점 근사. 키 설정 후 재실행하면 상세주소 좌표가 정밀화됨" }
+if (-not $kakaoKey) { Write-Host "※ KAKAO_REST_API_KEY 미설정 → 고용24 상세주소도 시군 중심점 근사. 키 설정 후 재실행하면 고용24 상세주소 좌표가 정밀화됨" }
 else { Write-Host "카카오 API 호출: $script:apiCalls 건 (캐시 재사용 포함 총 $($geoCache.Count)건 캐시)" }
 Write-Host "산출물: data\processed\jobs.json (백엔드 시딩용)"

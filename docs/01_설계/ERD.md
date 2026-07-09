@@ -29,7 +29,7 @@
 | code | VARCHAR | |
 | code_name | VARCHAR | |
 
-### company_address (사업자번호 → 주소 매핑, 잡코리아 보완용)
+### company_address (기업/본사 주소 참고용)
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
 | biz_no | VARCHAR PK | 숫자만 |
@@ -45,6 +45,7 @@
 
 ## 지오코딩 파이프라인 메모
 
-1. 고용24: `BASIC_ADDR` 그대로 지오코딩
-2. 잡코리아: `BIZ_NO`(숫자만) → `company_address.biz_no` 조인 → 있으면 상세 지오코딩, 없으면 `AREA_INFO` 지역명 중심점 근사
-3. 결과를 `geocode_precision`에 기록해 프런트에서 정확도 표시에 활용 가능
+1. 고용24: `BASIC_ADDR + DETAIL_ADDR` 근무지 상세주소를 지오코딩. 카카오 REST 키가 없거나 실패하면 시·군 대표 좌표 근사
+2. 잡코리아: 상세 근무지 주소가 없으므로 `AREA_INFO` 지역명 기준 시·군 대표 좌표 근사
+3. 기업/본사 주소·좌표는 공고 근무지와 다를 수 있어 좌표 우선순위에서 제외
+4. 결과를 `geocode_precision`에 기록해 프런트에서 정확도 표시에 활용 가능

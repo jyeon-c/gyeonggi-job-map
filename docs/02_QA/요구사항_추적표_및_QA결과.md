@@ -26,7 +26,8 @@
 - 최종 460건: 고용24 27, 잡코리아 433
 - 검증: ID·공고·URL 중복 0, 필수 결측 0, 좌표/날짜/코드 형식 오류 0
 - 상세 결과: `data/processed/data-quality-report.json`
-- 좌표 연결: `MAP_COOR_Y=위도`, `MAP_COOR_X=경도`; 별도 기업 테이블이므로 `BUSINO ↔ BIZ_NO` 일치 건만 사용
+- 좌표 기준: 공고 근무지 기준. 고용24는 `BASIC_ADDR + DETAIL_ADDR`, 잡코리아는 상세 주소가 없어 `AREA_INFO` 지역 근사 좌표 사용
+- `기업좌표_샘플.csv`의 `MAP_COOR_Y=위도`, `MAP_COOR_X=경도`는 기업 위치 보조 자료이며 공고 좌표로 우선 적용하지 않음
 
 ## 자동 테스트 범위
 
