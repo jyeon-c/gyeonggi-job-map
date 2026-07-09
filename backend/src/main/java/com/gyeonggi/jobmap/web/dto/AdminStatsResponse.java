@@ -8,6 +8,9 @@ import java.util.List;
  */
 public record AdminStatsResponse(
     long total,
+    long activeTotal,
+    long expiredTotal,
+    String statsDate,
     List<StatItem> bySource,
     List<StatItem> byRegion,
     List<StatItem> byCareer,

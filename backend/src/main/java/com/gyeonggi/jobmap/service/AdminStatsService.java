@@ -4,6 +4,8 @@ import com.gyeonggi.jobmap.repository.JobPostingRepository;
 import com.gyeonggi.jobmap.repository.JobPostingRepository.KeyCount;
 import com.gyeonggi.jobmap.web.dto.AdminStatsResponse;
 import com.gyeonggi.jobmap.web.dto.AdminStatsResponse.StatItem;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,12 +21,17 @@ public class AdminStatsService {
 
   /** 지역 통계에 노출할 시·군 상위 개수 */
   private static final int REGION_TOP_N = 15;
+  private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 
   private final JobPostingRepository repository;
 
   public AdminStatsResponse stats() {
+    LocalDate today = LocalDate.now(SERVICE_ZONE);
     return new AdminStatsResponse(
         repository.count(),
+        repository.countActiveAsOf(today),
+        repository.countExpiredAsOf(today),
+        today.toString(),
         toItems(repository.countBySource()),
         regionByCity(repository.countByRegionRaw()),
         toItems(repository.countByCareer()),

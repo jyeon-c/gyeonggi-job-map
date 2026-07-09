@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>경기도 일자리맵 — 관리자 통계</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/admin.css">
+  <link rel="stylesheet" href="css/style.css?v=20260709-1">
+  <link rel="stylesheet" href="css/admin.css?v=20260709-1">
 </head>
 <body class="admin">
 
@@ -48,7 +48,23 @@
 
     <!-- 통계 (인증 후 표시) -->
     <div class="admin-stats" id="statsWrap" hidden>
-      <p class="admin-total">전체 채용공고 <strong id="totalCount">–</strong>건</p>
+      <div class="admin-summary">
+        <div class="admin-summary__card">
+          <span>전체 적재 공고</span>
+          <strong id="totalCount">–</strong>
+          <em>원본 정제 후 DB 적재 기준</em>
+        </div>
+        <div class="admin-summary__card admin-summary__card--active">
+          <span>현재 지도 노출</span>
+          <strong id="activeCount">–</strong>
+          <em>마감 공고 제외</em>
+        </div>
+        <div class="admin-summary__card admin-summary__card--expired">
+          <span>마감 공고</span>
+          <strong id="expiredCount">–</strong>
+          <em id="statsDate">기준일 –</em>
+        </div>
+      </div>
       <div class="admin-grid" id="statsGrid"></div>
     </div>
 
@@ -57,6 +73,6 @@
 
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="js/config.js"></script>
-  <script src="js/admin.js"></script>
+  <script src="js/admin.js?v=20260709-1"></script>
 </body>
 </html>

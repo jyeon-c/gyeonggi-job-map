@@ -1,6 +1,7 @@
 package com.gyeonggi.jobmap.repository;
 
 import com.gyeonggi.jobmap.domain.JobPosting;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -82,4 +83,10 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
   /** 지역은 원본 표기가 다양('성남시 분당구', '의정부시, 서울…') → 서비스에서 시·군으로 합산 */
   @Query("select j.region as key, count(j) as count from JobPosting j group by j.region")
   List<KeyCount> countByRegionRaw();
+
+  @Query("select count(j) from JobPosting j where j.deadline is null or j.deadline >= :today")
+  long countActiveAsOf(@Param("today") LocalDate today);
+
+  @Query("select count(j) from JobPosting j where j.deadline is not null and j.deadline < :today")
+  long countExpiredAsOf(@Param("today") LocalDate today);
 }

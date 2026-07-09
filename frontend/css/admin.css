@@ -123,12 +123,40 @@ body.admin {
   padding: 28px 24px 60px;
 }
 
-.admin-total {
-  font-size: 16px;
-  color: var(--text-body);
+.admin-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
   margin-bottom: 20px;
 }
-.admin-total strong { color: var(--primary); font-weight: 800; font-size: 20px; }
+
+.admin-summary__card {
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px;
+}
+
+.admin-summary__card span,
+.admin-summary__card em {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+.admin-summary__card strong {
+  display: block;
+  margin: 6px 0 4px;
+  font-size: 28px;
+  line-height: 1;
+  color: var(--text-strong);
+  font-weight: 800;
+}
+
+.admin-summary__card--active strong { color: var(--primary); }
+.admin-summary__card--expired strong { color: var(--danger); }
 
 .admin-grid {
   display: grid;
@@ -207,5 +235,6 @@ body.admin {
 
 @media (max-width: 720px) {
   .admin-grid { grid-template-columns: 1fr; }
+  .admin-summary { grid-template-columns: 1fr; }
   .bar-row { grid-template-columns: 80px 1fr 46px; }
 }

@@ -62,6 +62,9 @@
 
   function render(stats) {
     $("#totalCount").text(stats.total.toLocaleString());
+    $("#activeCount").text((stats.activeTotal || 0).toLocaleString());
+    $("#expiredCount").text((stats.expiredTotal || 0).toLocaleString());
+    $("#statsDate").text("기준일 " + (stats.statsDate || "-"));
 
     var html =
       statCard("출처별 (공공/민간)", stats.bySource, { fillClassOf: sourceFill }) +
