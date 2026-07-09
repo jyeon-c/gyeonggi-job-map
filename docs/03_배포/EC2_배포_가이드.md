@@ -1,7 +1,7 @@
 # EC2 배포 가이드 (경기도 일자리맵)
 
 > AWS EC2 단일 인스턴스 + Docker Compose(nginx + backend + PostGIS) 배포 절차.
-> 아래 "내 인스턴스 설정"은 2026-07-05 기준 실제 생성 시 선택한 값이다.
+> 아래 "내 인스턴스 설정"은 2026-07-05 기준 실제 생성한 운영 환경 값이다.
 
 ## 진행 현황 (2026-07-05)
 - [x] EC2 인스턴스 생성 (`i-0b3b6aad5d317439d`, Ubuntu 24.04, t3.small)
@@ -51,8 +51,8 @@
 
 > ⚠️ 주의사항
 > - **SQL Server 포함 AMI는 절대 금지**(유료 라이선스). 반드시 일반 Ubuntu.
-> - SSH 22 소스는 가능하면 나중에 **내 IP** 로 제한 권장.
-> - 퍼블릭 IP는 인스턴스 중지→시작 시 바뀜. 고정하려면 **Elastic IP** 연결(선택).
+> - SSH 22 소스는 운영 보안 정책에 맞게 관리한다.
+> - 퍼블릭 IP는 인스턴스 중지→시작 시 바뀔 수 있어 Elastic IP를 연결했다.
 
 ### Elastic IP 고정 (완료 ✅)
 1. EC2 → 탄력적 IP → 탄력적 IP 주소 할당 (Amazon IPv4 풀, ap-northeast-2)
@@ -121,6 +121,7 @@ nano .env
 반드시 채울 값:
 ```dotenv
 KAKAO_JS_KEY=2fe6b0453c88a6eb0d85f54cf23c0220   # 카카오 JS 키
+KAKAO_REST_API_KEY=서버_주소_지오코딩용_REST키
 DB_NAME=jobmap
 DB_USERNAME=jobmap
 DB_PASSWORD=강력한_DB_비밀번호
@@ -210,8 +211,7 @@ git pull && docker compose up -d --build
 - 카카오 JavaScript SDK 도메인에 `https://jobmapkorea.com` 등록 → 지도 표시 정상
 - 앱 코드 수정 없이 동작: nginx `server_name _`, 프런트 `apiBase=""`(같은 오리진)
 
-> 향후 보안 강화(선택): origin 을 Cloudflare IP 대역만 허용(보안그룹) + SSL 모드 Full(origin 인증서).
-> 지금은 실습/데모 수준으로 Flexible 로 충분.
+> 운영 HTTPS는 Cloudflare 프록시에서 처리한다.
 
 ---
 
@@ -229,10 +229,10 @@ git pull && docker compose up -d --build
 - `frontend/embed.js`(위젯), `frontend/embed-demo.html`(삽입 데모). nginx 가 자동 서빙(별도 설정 불필요).
 - iframe URL 은 스크립트 origin 에서 자동 계산(로컬 8087 / 운영 도메인 모두 대응).
 
-## 13. 남은 과제
+## 13. 운영 확인 항목
 
-- [ ] (사용자) SSH 소스를 내 IP 로 제한 (현재 0.0.0.0/0) — AWS 보안그룹에서
-- [ ] (사용자) `고객요청사항_분석.md` 채우기 (엑셀 11건)
-- [ ] (선택) 관리자 비밀번호 더 강력하게
-- [ ] (선택) 카카오 REST 키로 좌표 정밀화 (KAKAO_REST_API_KEY 필요)
-- [ ] (선택) Flyway 마이그레이션 / GitHub Actions 자동 배포
+- 사용자 화면: `https://jobmapkorea.com`
+- 관리자 화면: `https://jobmapkorea.com/admin.html`
+- 팝업 위젯 데모: `https://jobmapkorea.com/embed-demo.html`
+- 채용공고 API: `https://jobmapkorea.com/api/jobs?size=1`
+- 관리자 통계: 전체 460건, 마감 제외 336건, 마감 124건

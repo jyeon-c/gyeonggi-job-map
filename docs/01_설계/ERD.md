@@ -22,30 +22,15 @@
 | deadline | DATE | null이면 상시채용 |
 | url | VARCHAR | 원문 지원 링크 |
 
-### common_code (공통코드 통합)
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| code_group | VARCHAR | CMMN_100 등 |
-| code | VARCHAR | |
-| code_name | VARCHAR | |
-
-### company_address (기업/본사 주소 참고용)
-| 컬럼 | 타입 | 설명 |
-|---|---|---|
-| biz_no | VARCHAR PK | 숫자만 |
-| ent_name | VARCHAR | |
-| hdqtr_addr | VARCHAR | |
-| hdqtr_detail_addr | VARCHAR | |
-
 ## 인덱스·공간 전환
 
 - `job_posting.biz_no` → 조인용
 - `job_posting(career_code, edu_code, employment_type_code)` → 필터 복합 인덱스 (필요 시)
-- 현재는 `lat/lng` 범위 조건을 사용한다. 대용량 전환 시 `geom GEOMETRY(Point,4326)`와 GiST를 추가한다.
+- 현재 구현은 `lat/lng` 범위 조건을 사용한다.
 
 ## 지오코딩 파이프라인 메모
 
 1. 고용24: `BASIC_ADDR + DETAIL_ADDR` 근무지 상세주소를 지오코딩. 카카오 REST 키가 없거나 실패하면 시·군 대표 좌표 근사
-2. 잡코리아: 상세 근무지 주소가 없으므로 `AREA_INFO` 지역명 기준 시·군 대표 좌표 근사
-3. 기업/본사 주소·좌표는 공고 근무지와 다를 수 있어 좌표 우선순위에서 제외
-4. 결과를 `geocode_precision`에 기록해 프런트에서 정확도 표시에 활용 가능
+2. 잡코리아: `BIZ_NO`와 `기업주소_사업자번호.BIZRNO`를 조인해 주소를 보완하고 지오코딩. 실패하면 `AREA_INFO` 지역명 기준 시·군 대표 좌표 근사
+3. 기업좌표 샘플은 보조·검증 자료로만 사용
+4. 결과를 `geocode_precision`에 기록해 프런트에서 정확도 표시에 활용
