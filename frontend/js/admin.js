@@ -143,9 +143,6 @@
     $("#jobSalaryMin").val(job && job.salaryMin != null ? job.salaryMin : "");
     $("#jobPostedAt").val(job && job.postedAt ? job.postedAt : todayYmd());
     $("#jobDeadline").val(job && job.deadline ? job.deadline : "");
-    $("#jobLat").val(job && job.lat != null ? job.lat : "37.2749");
-    $("#jobLng").val(job && job.lng != null ? job.lng : "127.0096");
-    $("#jobGeocodePrecision").val(job ? job.geocodePrecision : "region_approx");
     $("#jobBizNo").val(job && job.bizNo ? job.bizNo : "");
     $("#jobUrl").val(job ? job.url : "");
     $("#jobFormModal").prop("hidden", false);
@@ -181,10 +178,7 @@
       salaryMin: nullableNumber($("#jobSalaryMin").val()),
       postedAt: $("#jobPostedAt").val() || null,
       deadline: $("#jobDeadline").val() || null,
-      url: $("#jobUrl").val().trim(),
-      lat: Number($("#jobLat").val()),
-      lng: Number($("#jobLng").val()),
-      geocodePrecision: $("#jobGeocodePrecision").val()
+      url: $("#jobUrl").val().trim()
     };
   }
 
@@ -202,7 +196,7 @@
       closeJobForm();
       return loadStats(getAuth(), function () { showLogin(false); });
     }).catch(function (err) {
-      $("#jobFormError").prop("hidden", false).text("저장에 실패했습니다. 필수값과 좌표/URL 형식을 확인해 주세요.");
+      $("#jobFormError").prop("hidden", false).text("저장에 실패했습니다. 필수값과 주소/URL 형식을 확인해 주세요.");
       if (window.console) console.error("[admin] 공고 저장 실패:", err);
     });
   }

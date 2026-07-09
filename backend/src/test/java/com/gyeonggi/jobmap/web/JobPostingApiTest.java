@@ -240,10 +240,7 @@ class JobPostingApiTest {
           "salary":"회사 내규에 따름",
           "postedAt":"2026-07-09",
           "deadline":"2026-08-01",
-          "url":"https://example.com/job",
-          "lat":37.2636,
-          "lng":127.0286,
-          "geocodePrecision":"region_approx"
+          "url":"https://example.com/job"
         }
         """;
 
@@ -253,6 +250,9 @@ class JobPostingApiTest {
             .content(body))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.title").value("관리자 등록 공고"))
+        .andExpect(jsonPath("$.lat").value(37.2636))
+        .andExpect(jsonPath("$.lng").value(127.0286))
+        .andExpect(jsonPath("$.geocodePrecision").value("region_approx"))
         .andReturn().getResponse().getContentAsString();
 
     Long id = Long.valueOf(created.replaceAll(".*\"id\":(\\d+).*", "$1"));

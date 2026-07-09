@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>경기도 일자리맵 — 관리자 통계</title>
-  <link rel="stylesheet" href="css/style.css?v=20260709-4">
-  <link rel="stylesheet" href="css/admin.css?v=20260709-4">
+  <link rel="stylesheet" href="css/style.css?v=20260709-5">
+  <link rel="stylesheet" href="css/admin.css?v=20260709-5">
 </head>
 <body class="admin">
 
@@ -146,15 +146,9 @@
         <label>최소연봉(만원)<input id="jobSalaryMin" type="number" min="0"></label>
         <label>등록일<input id="jobPostedAt" type="date"></label>
         <label>마감일<input id="jobDeadline" type="date"></label>
-        <label>위도<input id="jobLat" type="number" step="0.000001" required></label>
-        <label>경도<input id="jobLng" type="number" step="0.000001" required></label>
-        <label>좌표정확도
-          <select id="jobGeocodePrecision">
-            <option value="region_approx">지역 근사</option>
-            <option value="company_address">기업주소 기준</option>
-            <option value="exact">정확</option>
-          </select>
-        </label>
+        <p class="admin-form-grid--wide admin-form-help">
+          좌표는 저장 시 주소/지역 기준으로 자동 생성됩니다. 주소 지오코딩이 실패하면 지역 중심점으로 보정됩니다.
+        </p>
         <label>사업자번호<input id="jobBizNo" maxlength="10"></label>
         <label class="admin-form-grid--wide">원문 URL<input id="jobUrl" type="url" required></label>
       </div>
@@ -166,6 +160,6 @@
     </form>
   </div>
 
-  <script src="js/admin.js?v=20260709-4"></script>
+  <script src="js/admin.js?v=20260709-5"></script>
 </body>
 </html>

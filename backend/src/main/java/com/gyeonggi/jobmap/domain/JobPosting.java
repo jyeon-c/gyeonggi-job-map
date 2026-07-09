@@ -100,7 +100,7 @@ public class JobPosting {
 
   private Double lng;
 
-  /** 'exact' / 'region_approx' (ERD geocode_precision) */
+  /** 'exact' / 'company_address' / 'region_approx' (ERD geocode_precision) */
   @Column(length = 20)
   private String geocodePrecision;
 }

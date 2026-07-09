@@ -22,6 +22,7 @@ public class AdminJobService {
   private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 
   private final JobPostingRepository repository;
+  private final AdminGeocodingService geocodingService;
 
   @Transactional(readOnly = true)
   public PageResponse<JobResponse> search(String keyword, int page, int size) {
@@ -70,8 +71,7 @@ public class AdminJobService {
     String region = required(r.region(), "region");
     String addressRaw = required(r.addressRaw(), "addressRaw");
     String url = required(r.url(), "url");
-    Double lat = required(r.lat(), "lat");
-    Double lng = required(r.lng(), "lng");
+    AdminGeocodingService.Point point = geocodingService.resolve(addressRaw, region);
 
     job.setSource(source);
     job.setSourceName(defaultSourceName(source, r.sourceName()));
@@ -91,9 +91,9 @@ public class AdminJobService {
     job.setPostedAt(r.postedAt() == null ? LocalDate.now(SERVICE_ZONE) : r.postedAt());
     job.setDeadline(r.deadline());
     job.setUrl(url);
-    job.setLat(lat);
-    job.setLng(lng);
-    job.setGeocodePrecision(defaultText(r.geocodePrecision(), "region_approx"));
+    job.setLat(point.lat());
+    job.setLng(point.lng());
+    job.setGeocodePrecision(point.precision());
   }
 
   private static ResponseStatusException notFound(Long id) {
