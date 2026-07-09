@@ -16,6 +16,7 @@
 - [x] `http://3.34.208.244/` 접속 확인 — **배포 성공** ✅
 - [x] 카카오 JavaScript SDK 도메인에 `http://3.34.208.244` 등록 → 지도 표시
 - [x] `/admin.html` 관리자 로그인 확인 (admin / 설정한 비번)
+- [x] PostgreSQL/PostGIS 운영 DB 자동 백업 등록 (`~/jobmap-backups`, 매일 03:20)
 
 **→ 1차 배포 완료 (2026-07-05). 서비스 URL: http://3.34.208.244/**
 
@@ -25,6 +26,7 @@
 > - GitHub 원격 remote 는 lowercase `jyeon-c` 로 접근됨.
 > - **배포 브랜치는 `main`** — 서버는 main 을 clone/pull 한다. (jobs.json 이 dev 에만 있어 빌드 실패했던 이슈 → main 갱신으로 해결)
 > - `jobs.json`(배포 시드)은 `.gitignore` 예외로 커밋됨(`data/processed/*` + `!jobs.json`).
+> - 운영 DB 백업은 `scripts/backup-db.sh` / `scripts/install-db-backup-cron.sh` 사용. 상세는 `docs/03_배포/DB_백업_운영가이드.md`.
 
 ### 트러블슈팅 기록 (실제 겪은 것)
 1. `COPY data/processed/jobs.json ... not found` → jobs.json 이 gitignore 로 커밋 안 됨 → 예외 추가 후 커밋.

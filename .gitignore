@@ -29,6 +29,11 @@ Thumbs.db
 *.log
 logs/
 
+# === 운영 DB 백업 산출물 ===
+*.dump
+*.dump.sha256
+jobmap-backups/
+
 # === Obsidian (개인 설정만 제외, 노트 자체는 커밋됨) ===
 .obsidian/workspace*
 .obsidian/plugins/*/data.json
